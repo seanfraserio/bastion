@@ -27,21 +27,22 @@ export class CacheMiddleware implements PipelineMiddleware {
   }
 
   private computeKey(ctx: PipelineContext): string {
+    // C6: Preserve message order (no sorting) — order is semantically meaningful
     const messages = ctx.request.messages
-      .map((m) => ({ role: m.role, content: m.content }))
-      .sort((a, b) => {
-        if (a.role !== b.role) return a.role.localeCompare(b.role);
-        return a.content.localeCompare(b.content);
-      });
+      .map((m) => ({ role: m.role, content: m.content }));
 
-    const payload = JSON.stringify({
+    // C6: Scope cache by agent/team/environment
+    const keyData = JSON.stringify({
       model: ctx.request.model,
       messages,
       temperature: ctx.request.temperature,
       maxTokens: ctx.request.maxTokens,
+      agentName: ctx.agentName,
+      teamName: ctx.teamName,
+      environment: ctx.environment,
     });
 
-    return createHash("sha256").update(payload).digest("hex");
+    return createHash("sha256").update(keyData).digest("hex");
   }
 
   private evictExpired(): void {
@@ -63,7 +64,8 @@ export class CacheMiddleware implements PipelineMiddleware {
         entry.hits += 1;
         ctx.cacheHit = true;
         ctx.metadata.cacheKey = key;
-        return { action: "short-circuit", response: entry.response };
+        // C4: Deep-clone cached response to prevent shared mutable state
+        return { action: "short-circuit", response: structuredClone(entry.response) };
       }
 
       // Store key in metadata for the response phase

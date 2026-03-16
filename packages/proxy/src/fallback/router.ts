@@ -122,10 +122,14 @@ export function createProviderRouter(config: BastionConfig): ProviderRouter {
 
           return response;
         } catch (fallbackErr) {
+          console.error(
+            `Both primary ("${primaryName}") and fallback ("${fallbackName}") providers failed.`,
+            `Primary error:`, err,
+            `Fallback error:`, fallbackErr,
+          );
           throw new ProviderError(
             502,
-            `Both primary ("${primaryName}") and fallback ("${fallbackName}") providers failed. ` +
-              `Primary: ${String(err)}. Fallback: ${String(fallbackErr)}`,
+            "Provider request failed",
           );
         }
       }
@@ -133,9 +137,10 @@ export function createProviderRouter(config: BastionConfig): ProviderRouter {
       if (err instanceof ProviderError) {
         throw err;
       }
+      console.error(`Provider "${primaryName}" failed:`, err);
       throw new ProviderError(
         statusCode ?? 502,
-        `Provider "${primaryName}" failed: ${String(err)}`,
+        "Provider request failed",
       );
     }
   }

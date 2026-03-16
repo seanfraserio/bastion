@@ -44,6 +44,10 @@ export class OpenAIProvider implements IProvider {
     rawBody: unknown,
     config: ProviderConfig,
   ): Promise<NormalizedResponse> {
+    if (!config.apiKey) {
+      throw new Error(`API key not configured for provider '${this.name}'`);
+    }
+
     const url = `${config.baseUrl}/v1/chat/completions`;
 
     const messages: OpenAIMessage[] = [];
@@ -87,7 +91,7 @@ export class OpenAIProvider implements IProvider {
       const res = await fetch(url, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${config.apiKey ?? ""}`,
+          Authorization: `Bearer ${config.apiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(body),

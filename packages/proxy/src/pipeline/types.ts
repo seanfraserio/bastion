@@ -7,6 +7,7 @@ export interface PipelineContext {
   agentName?: string;
   teamName?: string;
   environment: string;
+  sourceIp?: string;
   provider: ProviderName;
   model: string;
   startTime: number;
@@ -77,6 +78,8 @@ export interface AuditEntry {
   durationMs: number;
   status: "success" | "blocked" | "error";
   requestId: string;
+  requestBody?: unknown;
+  responseBody?: unknown;
 }
 
 export interface IProvider {

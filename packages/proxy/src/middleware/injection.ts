@@ -41,16 +41,13 @@ export class InjectionDetectorMiddleware implements PipelineMiddleware {
   readonly phase = "request" as const;
 
   async process(ctx: PipelineContext): Promise<PipelineMiddlewareResult> {
-    // Concatenate all user message content for scanning
+    // Only concatenate and score user-role messages — system prompt is trusted content
     const userContent = ctx.request.messages
       .filter((m) => m.role === "user")
       .map((m) => m.content)
       .join("\n");
 
-    const systemContent = ctx.request.systemPrompt ?? "";
-    const fullText = `${systemContent}\n${userContent}`;
-
-    const score = scoreInjection(fullText);
+    const score = scoreInjection(userContent);
     ctx.metadata.injectionScore = score;
 
     // The injection detector does NOT block by itself --

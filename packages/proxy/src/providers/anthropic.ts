@@ -38,6 +38,10 @@ export class AnthropicProvider implements IProvider {
     rawBody: unknown,
     config: ProviderConfig,
   ): Promise<NormalizedResponse> {
+    if (!config.apiKey) {
+      throw new Error(`API key not configured for provider '${this.name}'`);
+    }
+
     const url = `${config.baseUrl}/v1/messages`;
 
     const body = rawBody ?? {
@@ -72,7 +76,7 @@ export class AnthropicProvider implements IProvider {
       const res = await fetch(url, {
         method: "POST",
         headers: {
-          "x-api-key": config.apiKey ?? "",
+          "x-api-key": config.apiKey,
           "anthropic-version": "2023-06-01",
           "content-type": "application/json",
         },

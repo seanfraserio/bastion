@@ -148,7 +148,17 @@ export const lanternSchema = z.object({
   enabled: z.boolean().default(false),
   endpoint: z.string().url().optional(),
   agent_name: z.string().optional(),
+  api_key: z.string().optional(),
 });
+
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+
+export const authSchema = z.object({
+  enabled: z.boolean().default(false),
+  tokens: z.array(z.string()).default([]),
+}).default({ enabled: false, tokens: [] });
 
 // ---------------------------------------------------------------------------
 // Top-level config
@@ -158,6 +168,7 @@ export const bastionConfigSchema = z.object({
   version: z.string(),
   proxy: proxySchema,
   providers: providersSchema,
+  auth: authSchema,
   cache: cacheSchema.optional(),
   rate_limits: rateLimitsSchema.optional(),
   policies: z.array(policySchema).optional(),

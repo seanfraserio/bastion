@@ -4,6 +4,7 @@ export {
   logLevelSchema,
   providersSchema,
   providerDefinitionSchema,
+  authSchema,
   cacheSchema,
   cacheStrategySchema,
   rateLimitsSchema,

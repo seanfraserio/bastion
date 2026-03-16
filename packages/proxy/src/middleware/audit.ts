@@ -12,16 +12,25 @@ export class AuditMiddleware implements PipelineMiddleware {
   readonly name = "audit";
   readonly phase = "response" as const;
 
+  private config: BastionConfig;
   private output: "file" | "stdout" | "http";
   private filePath?: string;
   private lanternEnabled: boolean;
   private lanternEndpoint?: string;
+  private lanternApiKey?: string;
 
   constructor(config: BastionConfig) {
+    this.config = config;
     this.output = config.audit?.output ?? "stdout";
     this.filePath = config.audit?.file_path;
     this.lanternEnabled = config.lantern?.enabled ?? false;
     this.lanternEndpoint = config.lantern?.endpoint;
+    this.lanternApiKey = config.lantern?.api_key;
+
+    // Warn if Lantern endpoint uses insecure HTTP
+    if (this.lanternEnabled && this.lanternEndpoint && this.lanternEndpoint.startsWith("http://")) {
+      console.warn("Warning: Lantern endpoint is using insecure http://. Consider using https:// instead.");
+    }
   }
 
   private buildAuditEntry(ctx: PipelineContext): AuditEntry {
@@ -32,7 +41,7 @@ export class AuditMiddleware implements PipelineMiddleware {
       status = "blocked";
     }
 
-    return {
+    const entry: AuditEntry = {
       id: ctx.id,
       timestamp: new Date().toISOString(),
       agentName: ctx.agentName,
@@ -50,6 +59,16 @@ export class AuditMiddleware implements PipelineMiddleware {
       status,
       requestId: ctx.requestId,
     };
+
+    if (this.config.audit?.include_request_body) {
+      entry.requestBody = ctx.request.rawBody;
+    }
+
+    if (this.config.audit?.include_response_body) {
+      entry.responseBody = ctx.response?.rawBody;
+    }
+
+    return entry;
   }
 
   async process(ctx: PipelineContext): Promise<PipelineMiddlewareResult> {
@@ -80,9 +99,13 @@ export class AuditMiddleware implements PipelineMiddleware {
     // Fire-and-forget span to Lantern if enabled
     if (this.lanternEnabled && this.lanternEndpoint) {
       const endpoint = this.lanternEndpoint;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (this.lanternApiKey) {
+        headers["Authorization"] = `Bearer ${this.lanternApiKey}`;
+      }
       fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: jsonLine,
       }).catch((err) => {
         console.warn(`Failed to send audit span to Lantern: ${String(err)}`);

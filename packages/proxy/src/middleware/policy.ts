@@ -7,12 +7,28 @@ import type {
 } from "../pipeline/types.js";
 
 /**
+ * Check if a regex pattern contains known catastrophic backtracking indicators.
+ * Rejects patterns with nested quantifiers like (a+)+, (a*)*,  (a+)*, etc.
+ */
+export function validateRegexSafety(pattern: string): boolean {
+  // Detect nested quantifiers: a group containing a quantifier, followed by a quantifier
+  // e.g. (a+)+, (a+)*, (a*)+, (a*)*,  (a{2,})+, etc.
+  const nestedQuantifier = /\([^)]*[+*]\)[+*{]/;
+  if (nestedQuantifier.test(pattern)) {
+    return false;
+  }
+  return true;
+}
+
+/**
  * Evaluate a single condition against the given text.
+ * Uses pre-compiled regexes from the provided map.
  */
 function evaluateCondition(
   condition: PolicyCondition,
   ctx: PipelineContext,
   text: string,
+  compiledRegexes: Map<string, RegExp>,
 ): boolean {
   switch (condition.type) {
     case "contains": {
@@ -23,8 +39,11 @@ function evaluateCondition(
     }
 
     case "regex": {
-      const flags = condition.case_sensitive ? "" : "i";
-      const re = new RegExp(condition.value, flags);
+      const re = compiledRegexes.get(condition.value);
+      if (!re) {
+        // Pattern was invalid or unsafe — treat as non-matching
+        return false;
+      }
       return re.test(text);
     }
 
@@ -98,9 +117,39 @@ export class PolicyMiddleware implements PipelineMiddleware {
   readonly phase = "both" as const;
 
   private policies: Policy[];
+  private compiledRegexes = new Map<string, RegExp>();
 
   constructor(config: BastionConfig) {
     this.policies = config.policies ?? [];
+
+    // Pre-compile all regex patterns at construction time
+    for (const policy of this.policies) {
+      if (policy.condition.type === "regex") {
+        const pattern = policy.condition.value;
+        const flags = policy.condition.case_sensitive ? "" : "i";
+
+        // Check for catastrophic backtracking
+        if (!validateRegexSafety(pattern)) {
+          console.warn(
+            `[policy] Unsafe regex pattern in policy "${policy.name}": ` +
+            `"${pattern}" contains nested quantifiers that may cause catastrophic backtracking. ` +
+            `This policy will be treated as non-matching.`,
+          );
+          continue;
+        }
+
+        try {
+          const re = new RegExp(pattern, flags);
+          this.compiledRegexes.set(pattern, re);
+        } catch (err) {
+          console.warn(
+            `[policy] Invalid regex pattern in policy "${policy.name}": ` +
+            `"${pattern}" — ${err instanceof Error ? err.message : String(err)}. ` +
+            `This policy will be treated as non-matching.`,
+          );
+        }
+      }
+    }
   }
 
   async process(ctx: PipelineContext): Promise<PipelineMiddlewareResult> {
@@ -114,7 +163,7 @@ export class PolicyMiddleware implements PipelineMiddleware {
       }
 
       const text = getTextField(policy.condition, ctx, currentPhase);
-      const matched = evaluateCondition(policy.condition, ctx, text);
+      const matched = evaluateCondition(policy.condition, ctx, text, this.compiledRegexes);
 
       const decision: PolicyDecision = {
         policyName: policy.name,

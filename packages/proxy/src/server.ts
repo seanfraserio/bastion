@@ -108,7 +108,7 @@ function buildPipelineContext(
   };
 }
 
-function buildPipeline(config: BastionConfig): Pipeline {
+function buildPipeline(config: BastionConfig): { pipeline: Pipeline; cacheMiddleware: CacheMiddleware } {
   const providerRouter = createProviderRouter(config);
   const pipeline = new Pipeline((ctx) => providerRouter.forward(ctx));
 
@@ -136,7 +136,7 @@ function buildPipeline(config: BastionConfig): Pipeline {
     pipeline.use(new AuditMiddleware(config));
   }
 
-  return pipeline;
+  return { pipeline, cacheMiddleware };
 }
 
 export async function createServer(configPath?: string) {
@@ -148,8 +148,7 @@ export async function createServer(configPath?: string) {
     logger: { level: config.proxy.log_level },
   });
 
-  let pipeline = buildPipeline(config);
-  const cacheMiddleware = new CacheMiddleware(config);
+  let { pipeline, cacheMiddleware } = buildPipeline(config);
 
   const stats: RequestStats = {
     totalRequests: 0,
@@ -157,27 +156,56 @@ export async function createServer(configPath?: string) {
     errors: 0,
   };
 
+  // Authentication hook
+  app.addHook("onRequest", async (request, reply) => {
+    if (!config.auth.enabled) {
+      return;
+    }
+
+    // GET /health is always allowed (but returns limited info for unauth'd)
+    if (request.method === "GET" && request.url === "/health") {
+      return;
+    }
+
+    const authHeader = request.headers["authorization"];
+    const apiKeyHeader = request.headers["x-api-key"];
+
+    let token: string | undefined;
+
+    if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
+      token = authHeader.slice(7);
+    } else if (typeof apiKeyHeader === "string") {
+      token = apiKeyHeader;
+    }
+
+    if (!token || !config.auth.tokens.includes(token)) {
+      reply.code(401).send({ error: "unauthorized" });
+      return;
+    }
+  });
+
   // Proxy handler factory
   function createProxyHandler(defaultProvider: ProviderName) {
     return async (
-      request: { body: unknown; headers: Record<string, string | string[] | undefined> },
+      request: { body: unknown; headers: Record<string, string | string[] | undefined>; ip: string; log: { error: (msg: unknown) => void } },
       reply: { code: (c: number) => { send: (b: unknown) => void }; send: (b: unknown) => void },
     ) => {
       stats.totalRequests += 1;
 
-      try {
-        const body = request.body as Record<string, unknown>;
-        const provider = routeToProvider(
-          defaultProvider === "anthropic" ? "/v1/messages" : "/v1/chat/completions",
-          config,
-        );
-        const normalizedRequest = buildNormalizedRequest(body, provider);
-        const ctx = buildPipelineContext(
-          normalizedRequest,
-          provider,
-          request.headers as Record<string, string | string[] | undefined>,
-        );
+      const body = request.body as Record<string, unknown>;
+      const provider = routeToProvider(
+        defaultProvider === "anthropic" ? "/v1/messages" : "/v1/chat/completions",
+        config,
+      );
+      const normalizedRequest = buildNormalizedRequest(body, provider);
+      const ctx = buildPipelineContext(
+        normalizedRequest,
+        provider,
+        request.headers as Record<string, string | string[] | undefined>,
+      );
+      ctx.sourceIp = request.ip;
 
+      try {
         const result = await pipeline.run(ctx);
 
         if (result.response?.rawBody) {
@@ -202,15 +230,15 @@ export async function createServer(configPath?: string) {
         }
 
         stats.errors += 1;
+        request.log.error(err);
         const statusCode =
           err instanceof Error && "statusCode" in err
             ? (err as { statusCode: number }).statusCode
             : 502;
         reply.code(statusCode).send({
-          error: {
-            type: "proxy_error",
-            message: err instanceof Error ? err.message : String(err),
-          },
+          error: "internal_error",
+          message: "An internal error occurred",
+          requestId: ctx.requestId,
         });
       }
     };
@@ -220,11 +248,30 @@ export async function createServer(configPath?: string) {
   app.post("/v1/messages", createProxyHandler("anthropic"));
   app.post("/v1/chat/completions", createProxyHandler("openai"));
 
-  app.get("/health", async () => ({
-    status: "ok",
-    version: VERSION,
-    uptime: process.uptime(),
-  }));
+  app.get("/health", async (request) => {
+    if (config.auth.enabled) {
+      // Check if the request is authenticated
+      const authHeader = request.headers["authorization"];
+      const apiKeyHeader = request.headers["x-api-key"];
+
+      let token: string | undefined;
+      if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
+        token = authHeader.slice(7);
+      } else if (typeof apiKeyHeader === "string") {
+        token = apiKeyHeader;
+      }
+
+      if (!token || !config.auth.tokens.includes(token)) {
+        return { status: "ok" };
+      }
+    }
+
+    return {
+      status: "ok",
+      version: VERSION,
+      uptime: process.uptime(),
+    };
+  });
 
   app.get("/stats", async () => ({
     totalRequests: stats.totalRequests,
@@ -237,7 +284,9 @@ export async function createServer(configPath?: string) {
   process.on("SIGHUP", async () => {
     try {
       const newConfig = await loadConfig(resolvedPath);
-      pipeline = buildPipeline(newConfig);
+      const rebuilt = buildPipeline(newConfig);
+      pipeline = rebuilt.pipeline;
+      cacheMiddleware = rebuilt.cacheMiddleware;
       app.log.info("Configuration reloaded successfully");
     } catch (err) {
       app.log.error(
