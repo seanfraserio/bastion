@@ -710,6 +710,133 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ==========================================================================
+   Pricing
+   ========================================================================== */
+
+.pricing {
+  padding: 96px 0;
+  background: var(--bg-primary);
+}
+
+.pricing-header {
+  text-align: center;
+  margin-bottom: 56px;
+}
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.pricing-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 36px 28px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.pricing-card:hover {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+  transform: translateY(-2px);
+}
+
+.pricing-card-featured {
+  border-color: var(--accent-purple);
+  box-shadow: 0 8px 32px rgba(139, 92, 246, 0.12);
+}
+
+.pricing-card-featured:hover {
+  box-shadow: 0 12px 40px rgba(139, 92, 246, 0.18);
+}
+
+.pricing-badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--gradient);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 16px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.pricing-card-header {
+  margin-bottom: 24px;
+}
+
+.pricing-tier {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+}
+
+.pricing-tier-desc {
+  font-size: 0.875rem;
+  color: var(--text-dimmed);
+  margin: 0;
+}
+
+.pricing-price {
+  margin-bottom: 28px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--border);
+}
+
+.pricing-amount {
+  font-size: 2.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.pricing-period {
+  font-size: 1rem;
+  color: var(--text-dimmed);
+  margin-left: 4px;
+}
+
+.pricing-features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 32px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pricing-features li {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.pricing-features .check {
+  color: var(--success);
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.pricing-btn {
+  width: 100%;
+  text-align: center;
+  justify-content: center;
+}
+
+/* ==========================================================================
    Responsive
    ========================================================================== */
 
@@ -806,6 +933,10 @@ h1, h2, h3, h4, h5, h6 {
   .security,
   .trilogy {
     padding: 64px 0;
+  }
+
+  .pricing-grid {
+    grid-template-columns: 1fr;
   }
 
   .cta-section {
