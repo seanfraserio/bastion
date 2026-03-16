@@ -1,0 +1,37 @@
+version: "1"
+
+proxy:
+  port: 4000
+  host: "127.0.0.1"
+  log_level: info
+
+providers:
+  primary: anthropic
+  fallback:
+    - openai
+  definitions:
+    anthropic:
+      api_key: "${ANTHROPIC_API_KEY}"
+      timeout_ms: 30000
+    openai:
+      api_key: "${OPENAI_API_KEY}"
+      timeout_ms: 30000
+
+cache:
+  enabled: true
+  strategy: exact
+  ttl_seconds: 3600
+
+rate_limits:
+  enabled: true
+  global:
+    requests_per_minute: 500
+
+policies: []
+
+audit:
+  enabled: true
+  output: file
+  path: ./logs/audit.jsonl
+  include_request_body: true
+  include_response_body: false

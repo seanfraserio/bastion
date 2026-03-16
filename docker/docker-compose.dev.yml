@@ -1,0 +1,15 @@
+services:
+  bastion:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "4000:4000"
+    volumes:
+      - ../bastion.yaml:/app/bastion.yaml:ro
+      - ../logs:/app/logs
+    environment:
+      - ANTHROPIC_API_KEY
+      - OPENAI_API_KEY
+      - BASTION_LOG_LEVEL=debug
+    restart: "no"

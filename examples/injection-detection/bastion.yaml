@@ -1,0 +1,43 @@
+version: "1"
+
+proxy:
+  port: 4000
+  host: "127.0.0.1"
+  log_level: info
+
+providers:
+  primary: anthropic
+  definitions:
+    anthropic:
+      api_key: "${ANTHROPIC_API_KEY}"
+      timeout_ms: 30000
+
+cache:
+  enabled: false
+
+rate_limits:
+  enabled: false
+
+policies:
+  - name: block-high-injection-risk
+    description: "Block requests with high injection score"
+    condition:
+      type: injection_score
+      threshold: 0.7
+    action: block
+    on: request
+
+  - name: warn-moderate-injection-risk
+    description: "Log a warning for requests with moderate injection score"
+    condition:
+      type: injection_score
+      threshold: 0.5
+    action: warn
+    on: request
+
+audit:
+  enabled: true
+  output: file
+  path: ./logs/audit.jsonl
+  include_request_body: true
+  include_response_body: false

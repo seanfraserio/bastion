@@ -1,0 +1,27 @@
+version: "1"
+
+proxy:
+  port: 4000
+  host: "127.0.0.1"
+  log_level: info
+
+providers:
+  primary: anthropic
+  definitions:
+    anthropic:
+      api_key: "${ANTHROPIC_API_KEY}"
+      timeout_ms: 30000
+
+cache:
+  enabled: false
+
+rate_limits:
+  enabled: false
+
+policies: []
+
+audit:
+  enabled: true
+  output: stdout
+  include_request_body: false
+  include_response_body: false

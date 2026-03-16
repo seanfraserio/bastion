@@ -1,0 +1,36 @@
+version: "1"
+
+proxy:
+  port: 4000
+  host: "127.0.0.1"
+  log_level: info
+
+providers:
+  primary: anthropic
+  definitions:
+    anthropic:
+      api_key: "${ANTHROPIC_API_KEY}"
+      timeout_ms: 30000
+
+cache:
+  enabled: false
+
+rate_limits:
+  enabled: true
+  global:
+    requests_per_minute: 1000
+  agents:
+    - name: support-triage
+      requests_per_minute: 100
+    - name: batch-processor
+      requests_per_minute: 20
+      tokens_per_minute: 10000
+
+policies: []
+
+audit:
+  enabled: true
+  output: file
+  path: ./logs/audit.jsonl
+  include_request_body: false
+  include_response_body: false

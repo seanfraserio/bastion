@@ -1,0 +1,45 @@
+version: "1"
+
+proxy:
+  port: 4000
+  host: "127.0.0.1"
+  log_level: info
+
+providers:
+  primary: anthropic
+  definitions:
+    anthropic:
+      api_key: "${ANTHROPIC_API_KEY}"
+      timeout_ms: 30000
+
+cache:
+  enabled: false
+
+rate_limits:
+  enabled: false
+
+policies:
+  - name: redact-pii-in-responses
+    description: "Redact email addresses and phone numbers from model responses"
+    condition:
+      type: pii_detected
+      categories:
+        - email
+        - phone
+    action: redact
+    on: response
+
+  - name: block-password-in-requests
+    description: "Block any request containing the word 'password'"
+    condition:
+      type: contains
+      value: "password"
+    action: block
+    on: request
+
+audit:
+  enabled: true
+  output: file
+  path: ./logs/audit.jsonl
+  include_request_body: true
+  include_response_body: true
