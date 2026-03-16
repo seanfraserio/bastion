@@ -1,4 +1,4 @@
-import type { BastionConfig, Policy, PolicyCondition } from "@bastion-ai/config";
+import type { BastionConfig, Policy, PolicyCondition } from "@openbastion-ai/config";
 import type {
   PipelineContext,
   PipelineMiddleware,

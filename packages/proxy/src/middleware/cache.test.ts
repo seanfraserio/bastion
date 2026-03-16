@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { CacheMiddleware } from "./cache.js";
 import type { PipelineContext, NormalizedResponse } from "../pipeline/types.js";
-import type { BastionConfig } from "@bastion-ai/config";
+import type { BastionConfig } from "@openbastion-ai/config";
 
 function makeMockContext(overrides: Partial<PipelineContext> = {}): PipelineContext {
   return {

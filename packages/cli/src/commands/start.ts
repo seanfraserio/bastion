@@ -1,6 +1,6 @@
 import { Command } from "commander";
-import { loadConfig } from "@bastion-ai/config";
-import { createServer } from "@bastion-ai/proxy";
+import { loadConfig } from "@openbastion-ai/config";
+import { createServer } from "@openbastion-ai/proxy";
 
 export function registerStartCommand(program: Command): void {
   program

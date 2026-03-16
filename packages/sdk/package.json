@@ -1,5 +1,5 @@
 {
-  "name": "@bastion-ai/sdk",
+  "name": "@openbastion-ai/sdk",
   "version": "0.1.0",
   "description": "Typed admin API client for Bastion",
   "main": "./dist/index.cjs",

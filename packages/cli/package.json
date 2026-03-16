@@ -1,5 +1,5 @@
 {
-  "name": "@bastion-ai/cli",
+  "name": "@openbastion-ai/cli",
   "version": "0.1.0",
   "description": "CLI binary for Bastion",
   "main": "./dist/index.cjs",
@@ -21,8 +21,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@bastion-ai/config": "workspace:*",
-    "@bastion-ai/proxy": "workspace:*",
+    "@openbastion-ai/config": "workspace:*",
+    "@openbastion-ai/proxy": "workspace:*",
     "commander": "^12.0.0"
   },
   "devDependencies": {

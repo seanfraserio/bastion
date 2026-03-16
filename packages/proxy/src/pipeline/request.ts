@@ -1,4 +1,4 @@
-import type { BastionConfig } from "@bastion-ai/config";
+import type { BastionConfig } from "@openbastion-ai/config";
 import type { PipelineMiddleware } from "./types.js";
 import { RateLimitMiddleware } from "../middleware/rate-limit.js";
 import { InjectionDetectorMiddleware } from "../middleware/injection.js";

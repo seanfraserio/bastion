@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { PolicyMiddleware } from "./policy.js";
 import type { PipelineContext } from "../pipeline/types.js";
-import type { BastionConfig, Policy } from "@bastion-ai/config";
+import type { BastionConfig, Policy } from "@openbastion-ai/config";
 
 function makeMockContext(
   overrides: Partial<PipelineContext> = {},

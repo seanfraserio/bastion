@@ -32,10 +32,10 @@ importers:
 
   packages/cli:
     dependencies:
-      '@bastion-ai/config':
+      '@openbastion-ai/config':
         specifier: workspace:*
         version: link:../config
-      '@bastion-ai/proxy':
+      '@openbastion-ai/proxy':
         specifier: workspace:*
         version: link:../proxy
       commander:
@@ -91,7 +91,7 @@ importers:
 
   packages/proxy:
     dependencies:
-      '@bastion-ai/config':
+      '@openbastion-ai/config':
         specifier: workspace:*
         version: link:../config
       fastify:

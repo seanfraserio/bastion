@@ -1,5 +1,5 @@
 {
-  "name": "@bastion-ai/proxy",
+  "name": "@openbastion-ai/proxy",
   "version": "0.1.0",
   "description": "Core proxy server for Bastion",
   "main": "./dist/index.cjs",
@@ -18,7 +18,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@bastion-ai/config": "workspace:*",
+    "@openbastion-ai/config": "workspace:*",
     "fastify": "^4.28.0",
     "pino": "^9.0.0",
     "uuid": "^10.0.0"

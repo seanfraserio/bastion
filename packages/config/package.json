@@ -1,5 +1,5 @@
 {
-  "name": "@bastion-ai/config",
+  "name": "@openbastion-ai/config",
   "version": "0.1.0",
   "description": "Configuration schema and loader for Bastion",
   "main": "./dist/index.cjs",

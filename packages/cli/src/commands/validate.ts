@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { loadConfig } from "@bastion-ai/config";
+import { loadConfig } from "@openbastion-ai/config";
 
 function maskKey(key: string | undefined): string {
   if (!key) return "(not set)";

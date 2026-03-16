@@ -1,6 +1,6 @@
 import Fastify from "fastify";
 import { v4 as uuidv4 } from "uuid";
-import { loadConfig, type BastionConfig } from "@bastion-ai/config";
+import { loadConfig, type BastionConfig } from "@openbastion-ai/config";
 import { Pipeline, PipelineBlockedError } from "./pipeline/index.js";
 import type {
   PipelineContext,

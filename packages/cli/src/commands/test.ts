@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { loadConfig } from "@bastion-ai/config";
+import { loadConfig } from "@openbastion-ai/config";
 
 export function registerTestCommand(program: Command): void {
   program

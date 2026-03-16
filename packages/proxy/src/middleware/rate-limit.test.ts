@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { RateLimitMiddleware } from "./rate-limit.js";
 import type { PipelineContext } from "../pipeline/types.js";
-import type { BastionConfig } from "@bastion-ai/config";
+import type { BastionConfig } from "@openbastion-ai/config";
 
 function makeMockContext(overrides: Partial<PipelineContext> = {}): PipelineContext {
   return {

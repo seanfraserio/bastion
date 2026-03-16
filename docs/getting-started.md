@@ -5,7 +5,7 @@ This guide walks you through installing Bastion, creating a configuration, and p
 ## 1. Install
 
 ```bash
-npm install -g @bastion-ai/cli
+npm install -g @openbastion-ai/cli
 ```
 
 Verify the installation:

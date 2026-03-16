@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { BastionConfig } from "@bastion-ai/config";
+import type { BastionConfig } from "@openbastion-ai/config";
 import type {
   PipelineContext,
   PipelineMiddleware,

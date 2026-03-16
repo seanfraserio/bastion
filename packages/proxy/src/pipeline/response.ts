@@ -1,4 +1,4 @@
-import type { BastionConfig } from "@bastion-ai/config";
+import type { BastionConfig } from "@openbastion-ai/config";
 import type { PipelineMiddleware } from "./types.js";
 import { CacheMiddleware } from "../middleware/cache.js";
 import { PolicyMiddleware } from "../middleware/policy.js";

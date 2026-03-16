@@ -86,7 +86,7 @@ SVG shield outline with vertical pipeline flow:
 2. **Hero — Pipeline-first**
    - Centered headline: "Protect Every AI Request"
    - Subtext: "Zero code changes. Full control. Complete audit trail."
-   - Install command: `npm install -g @bastion-ai/cli`
+   - Install command: `npm install -g @openbastion-ai/cli`
    - Pipeline visualization: horizontal middleware chain
      - `Your App → Rate Limit → Injection → Policy → Cache → LLM`
      - Each stage is a bordered pill with accent color

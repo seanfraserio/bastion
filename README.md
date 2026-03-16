@@ -11,7 +11,7 @@ AI agents make uncontrolled calls to LLM providers. There is no standard way to 
 Install the CLI:
 
 ```bash
-npm install -g @bastion-ai/cli
+npm install -g @openbastion-ai/cli
 ```
 
 Create a `bastion.yaml`:
