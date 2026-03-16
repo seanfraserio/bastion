@@ -1,10 +1,12 @@
 # Concepts
 
-This document explains the core architecture of Bastion and how requests flow through the system.
+This document explains the core architecture of Bastion and the reasoning behind its design decisions. It is intended to help you build a mental model of how Bastion works, why it is structured the way it is, and how its components relate to each other.
 
 ## The Pipeline Model
 
 Every request that passes through Bastion flows through a **middleware pipeline** -- an ordered chain of processing steps. Each middleware in the chain can inspect, modify, or reject the request before it reaches the LLM provider, and can do the same to the response on the way back.
+
+The reason Bastion uses a pipeline rather than a monolithic proxy is composability. Each middleware is independent -- it reads from a shared context, does its work, and writes results back. This means you can enable or disable features (rate limiting, caching, PII detection) without affecting the rest of the chain. It also means new middleware can be added without modifying existing ones.
 
 ```
 Client Request
@@ -52,9 +54,17 @@ The middleware chain is evaluated in a specific order, and this order matters:
 
 ### Why Order Matters
 
-Rate limiting runs before injection detection because it is a simple counter check -- there is no reason to run an expensive injection scorer on a request that would be rejected for exceeding rate limits anyway.
+The ordering of middleware is not arbitrary -- changing it produces incorrect or dangerous behavior. Here are concrete examples of what goes wrong when the order is changed:
 
-Cache lookup runs after policy evaluation on requests so that policy-violating requests are never served from cache. Cache store runs before policy evaluation on responses so that the original unredacted response is cached (redaction is applied on read, not on store).
+**Rate limiting must run before injection detection.** Rate limiting is a simple counter check. Injection detection, especially with the enterprise ML scorer, calls an external LLM classifier. If injection detection ran first, an attacker could flood Bastion with thousands of requests, each triggering an expensive classifier call, effectively turning Bastion into an amplification vector for a denial-of-service attack against your own infrastructure. By running the cheap check first, excess traffic is rejected before any expensive work begins.
+
+**Injection detection must run before policy evaluation.** Policies can reference the injection score in their conditions (e.g., `injection_score > 0.7 -> block`). If policies ran first, they would see an injection score of zero for every request because the scorer has not yet executed. This means injection-based policies would never trigger, silently disabling a critical security layer.
+
+**Policy evaluation on requests must run before cache lookup.** If the cache ran first, a request containing a policy violation (for example, a prompt injection attempt) could be served directly from cache, bypassing all policy checks. The reason policy evaluation gates the cache is to ensure that no request -- cached or not -- can circumvent security policies.
+
+**Cache store must run before policy evaluation on responses.** This matters because of PII redaction. When a response contains an email address and a PII redaction policy is active, the original unredacted response is stored in the cache. The reason for this is that redaction is applied on read, not on store. If the redacted version were cached, a future change to redaction rules (e.g., adding phone numbers to the redaction list) would not apply to already-cached responses. Storing the original ensures that the latest redaction policies are always applied at retrieval time.
+
+**Audit must run last.** The audit middleware needs a complete picture of what happened -- which provider was used, how long the request took, which policies matched, whether the response was cached, and what the final content looks like after redaction. If audit ran earlier, it would capture an incomplete snapshot of the request lifecycle.
 
 ## PipelineContext
 
@@ -70,16 +80,24 @@ Every request creates a **PipelineContext** -- a shared state object that travel
 
 Middleware reads from and writes to the context. For example, the injection detection middleware writes the score to the context, and a downstream policy reads that score to decide whether to block.
 
+The reason the context exists as a shared object (rather than passing data through function arguments) is that middleware stages are not always aware of each other. A policy does not need to know that injection detection exists -- it just reads `context.injectionScore` and acts on it. This decoupling is what makes the pipeline extensible.
+
 ## Provider Normalization
 
 Bastion supports multiple LLM providers (Anthropic, OpenAI, Ollama, Bedrock), each with its own API format. Internally, Bastion converts all provider-specific formats into a **common internal representation** before processing.
 
-This means:
+### Why Normalization Exists
 
-- Policies work the same regardless of which provider is being used
-- Switching providers does not require changing policies or middleware
-- Audit logs have a consistent format across providers
-- Cache keys are provider-agnostic (an OpenAI response can serve an equivalent Anthropic request in fallback scenarios)
+The reason for the normalization layer is that every other component in the pipeline -- policies, caching, audit, injection detection -- would otherwise need provider-specific logic. Without normalization, a PII redaction policy would need separate implementations for Anthropic's message format (which uses `content` arrays with typed blocks) and OpenAI's format (which uses plain `content` strings). Every new provider would multiply the maintenance burden across every middleware.
+
+By normalizing at the boundary, Bastion translates provider-specific formats exactly once on the way in and once on the way out. Everything in between operates on the common representation. This matters because:
+
+- **Policies work the same regardless of which provider is being used.** A `contains` condition matches against the normalized content, not a provider-specific field path. You write one policy, and it applies to all providers.
+- **Switching providers does not require changing policies or middleware.** If you move from OpenAI to Anthropic (or add Anthropic as a fallback), your policies, rate limits, and audit configuration remain unchanged.
+- **Audit logs have a consistent format across providers.** Whether a request went to Ollama or Bedrock, the audit entry has the same schema, making it possible to query and analyze logs without provider-specific parsing.
+- **Cache keys are provider-agnostic.** An OpenAI response can serve an equivalent Anthropic request in fallback scenarios because the cache operates on normalized content, not raw API payloads.
+
+The normalization layer also handles differences in error formats, token counting methods, and streaming protocols. The reason this complexity is hidden inside the provider adapter (rather than exposed to the pipeline) is to maintain the invariant that middleware never needs to know which provider is in use.
 
 ## Policy Evaluation
 
@@ -91,27 +109,41 @@ Policies are **declarative rules** defined in `bastion.yaml`. Each policy specif
 
 Policies are evaluated in the order they appear in the configuration. Multiple policies can match a single request, and their actions are applied in order. A `block` action short-circuits -- no further policies are evaluated.
 
+The reason policies are declarative (YAML configuration) rather than imperative (code) is that security rules should be auditable, diffable, and changeable without redeployment. A security team can review `bastion.yaml` and understand exactly what rules are enforced without reading application code.
+
 See the [Policies reference](./policies.md) for the full list of condition types and actions.
+
+## OSS vs Enterprise Boundary
+
+Bastion is split into an open-source core (MIT-licensed) and an enterprise extension (BUSL-1.1). The boundary between them is deliberate and follows a consistent philosophy.
+
+The OSS core includes everything needed to run a secure, functional LLM proxy: the pipeline, all provider adapters, exact-match caching, regex-based PII detection, heuristic injection scoring, declarative policies, rate limiting, and audit logging. Most teams can deploy OSS Bastion and get meaningful security and governance from day one.
+
+The enterprise extension adds capabilities that fall into three categories:
+
+1. **Accuracy upgrades.** The OSS PII detector uses regex patterns, which work well for structured data (emails, SSNs, credit card numbers) but struggle with unstructured entities like person names and addresses. The enterprise detector uses ML-based Named Entity Recognition, which catches entities that regex misses. Similarly, the OSS injection scorer uses heuristic pattern matching, while the enterprise scorer uses an LLM-based classifier that handles obfuscation, encoding, and multilingual attacks. These are not different features -- they are higher-accuracy implementations of the same feature, replacing the OSS implementation at the interface boundary.
+
+2. **Operational scale.** Cluster synchronization, SIEM export, and compliance reporting exist because organizations running Bastion across dozens of services and multiple teams need global rate limit enforcement, centralized audit pipelines, and regulatory evidence packages. These features are not useful at small scale, and they introduce infrastructure dependencies (Redis, Splunk, Elastic) that would add unnecessary complexity to the OSS core.
+
+3. **Organizational control.** Team RBAC and alerting exist because organizations with multiple teams need to scope policies per team, control who can modify configuration, and route security events to the right on-call channels. A single-team deployment does not need these abstractions.
+
+The reason the boundary matters is that it keeps the OSS core simple and dependency-light. You can run OSS Bastion with nothing more than a `bastion.yaml` file and an API key. Enterprise features are additive -- they enhance or replace OSS components through the same interfaces, never requiring changes to the core pipeline.
+
+See [Enterprise](./enterprise.md) for the full feature reference.
 
 ## Forge Integration
 
-Bastion is designed to work seamlessly with [Forge](https://github.com/your-org/forge), the agent orchestration framework. To route Forge agent traffic through Bastion, point the agent's base URL at the Bastion proxy:
+Bastion is designed to work seamlessly with [Forge](https://github.com/your-org/forge), the agent orchestration framework. The integration is straightforward because Bastion acts as a transparent proxy -- any application that makes HTTP calls to an LLM provider can route those calls through Bastion instead.
 
-```yaml
-# In forge.yaml -- point the agent at Bastion instead of the provider directly
-model:
-  provider: anthropic
-  base_url: "http://localhost:4000"    # Bastion proxy
-  name: claude-sonnet-4-6
-```
-
-With this configuration:
+With Forge routed through Bastion:
 
 - All agent traffic flows through Bastion's pipeline
 - Rate limits are enforced per agent (using the agent name from Forge)
 - Policies apply to all agent requests and responses
 - Audit logs capture the full agent conversation with Forge metadata
 - Lantern receives traces from both Forge (agent decisions) and Bastion (traffic governance)
+
+For configuration details on connecting Forge to Bastion, see the [Getting Started guide](./getting-started.md).
 
 ## The Trilogy
 
@@ -121,4 +153,4 @@ Bastion is the third product in the **Forge / Lantern / Bastion** trilogy:
 - **Lantern** observes agent behavior with traces, metrics, and dashboards
 - **Bastion** governs agent traffic with policies, rate limits, and audit logging
 
-Together, they provide a complete platform for building, observing, and securing AI agent systems.
+Together, they provide a complete platform for building, observing, and securing AI agent systems. The reason they are separate products (rather than a single monolith) is that each concern -- orchestration, observability, governance -- has different deployment requirements, update cadences, and operational owners. A security team manages Bastion policies; a platform team manages Forge agent definitions; an SRE team manages Lantern dashboards. Separating the products reflects how organizations actually divide responsibility.

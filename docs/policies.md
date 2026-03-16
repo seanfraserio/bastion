@@ -1,10 +1,12 @@
 # Policies
 
-Policies are declarative rules that Bastion evaluates against request and response content. Each policy specifies a condition to match, an action to take, and the phase (request or response) in which to evaluate.
+Policies are declarative rules that Bastion evaluates against request and response content. This page serves as both a reference for the policy system and a collection of practical patterns for common use cases.
 
-Policies are evaluated in the order they appear in `bastion.yaml`. A `block` action short-circuits evaluation -- no further policies run after a block.
+---
 
 ## Policy Structure
+
+Every policy has the same structure:
 
 ```yaml
 policies:
@@ -16,6 +18,16 @@ policies:
     action: block                # what to do on match
     on: request                  # when to evaluate
 ```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | `string` | Yes | Unique identifier for this policy. Appears in audit logs and error messages. |
+| `description` | `string` | No | Human-readable explanation. No effect on evaluation. |
+| `condition` | `object` | Yes | What to look for. See [Condition Types](#condition-types) below. |
+| `action` | `string` | Yes | What to do when the condition matches. See [Actions](#actions) below. |
+| `on` | `"request"` or `"response"` | Yes | Whether to evaluate on the inbound request or the outbound response. |
+
+Policies are evaluated in the order they appear in `bastion.yaml`. A `block` action short-circuits evaluation -- no further policies run after a block.
 
 ---
 
@@ -97,13 +109,6 @@ The OSS injection scorer uses heuristic pattern matching. The enterprise scorer 
     threshold: 0.7
   action: block
   on: request
-
-- name: warn-suspicious-prompts
-  condition:
-    type: injection_score
-    threshold: 0.5
-  action: warn
-  on: request
 ```
 
 ### `pii_detected`
@@ -174,9 +179,174 @@ Useful for categorizing traffic without affecting it.
 
 ---
 
+## Common Patterns
+
+These patterns solve frequently encountered problems. Each shows the complete policy configuration and explains when to use it.
+
+### Block prompt injection attempts
+
+If you want to block requests that look like prompt injection attacks, use a layered approach. A high-threshold block catches confident detections, while a lower-threshold warn captures borderline cases for review without disrupting legitimate traffic.
+
+```yaml
+policies:
+  # Block high-confidence injection attempts
+  - name: block-injection-high
+    description: "Block requests with strong injection signals"
+    condition:
+      type: injection_score
+      threshold: 0.8
+    action: block
+    on: request
+
+  # Warn on moderate injection risk
+  - name: warn-injection-moderate
+    description: "Flag borderline cases for security team review"
+    condition:
+      type: injection_score
+      threshold: 0.5
+    action: warn
+    on: request
+```
+
+The two-tier approach matters because prompt injection detection is probabilistic. A single threshold forces a tradeoff between false positives (blocking legitimate requests) and false negatives (allowing attacks). Two thresholds let you block the obvious attacks and monitor the ambiguous ones.
+
+If you also want to catch common jailbreak phrases that the scorer might miss, add a `contains` policy:
+
+```yaml
+  - name: block-jailbreak-phrases
+    description: "Catch known jailbreak patterns by exact text"
+    condition:
+      type: contains
+      value: "ignore all previous instructions"
+    action: block
+    on: request
+```
+
+### Redact PII from responses
+
+If you need to prevent personally identifiable information from reaching your application, add a PII redaction policy on the response phase. This ensures that even if the LLM includes PII in its output, the PII is stripped before your application sees it.
+
+```yaml
+policies:
+  - name: redact-response-pii
+    description: "Strip PII from all model responses"
+    condition:
+      type: pii_detected
+      categories:
+        - email
+        - phone
+        - ssn
+        - credit_card
+    action: redact
+    on: response
+```
+
+If you also want to prevent users from sending PII to the model (for example, to avoid PII entering training data), add a request-phase policy:
+
+```yaml
+  - name: block-request-pii
+    description: "Prevent PII from being sent to the model"
+    condition:
+      type: pii_detected
+      categories:
+        - ssn
+        - credit_card
+    action: block
+    on: request
+```
+
+Use `block` on request and `redact` on response. Blocking on request prevents PII from reaching the provider entirely. Redacting on response removes PII that the model generates from its training data or context.
+
+### Warn on long responses
+
+If you want to monitor for unexpectedly long model responses (which can indicate runaway generation, prompt injection that causes the model to dump its context, or excessive token costs), add a length check on the response phase.
+
+```yaml
+policies:
+  - name: warn-long-response
+    description: "Flag responses over 50k characters for review"
+    condition:
+      type: length_exceeds
+      max_length: 50000
+    action: warn
+    on: response
+```
+
+If you want to hard-block extremely long responses instead of just warning, change the action to `block` and set a higher threshold:
+
+```yaml
+  - name: block-excessive-response
+    description: "Reject responses over 200k characters"
+    condition:
+      type: length_exceeds
+      max_length: 200000
+    action: block
+    on: response
+```
+
+### Block requests containing internal data
+
+If you want to prevent agents from sending internal identifiers, API keys, or internal URLs to external LLM providers, use `regex` or `contains` policies to catch these patterns.
+
+```yaml
+policies:
+  - name: block-internal-api-keys
+    description: "Prevent API keys from being sent to the model"
+    condition:
+      type: regex
+      pattern: "(sk-[a-zA-Z0-9]{32,}|ghp_[a-zA-Z0-9]{36}|xoxb-[0-9]+-[a-zA-Z0-9]+)"
+    action: block
+    on: request
+
+  - name: block-internal-urls
+    description: "Prevent internal URLs from leaking to the model"
+    condition:
+      type: regex
+      pattern: "https?://[a-zA-Z0-9.-]+\\.internal\\.[a-zA-Z]{2,}"
+    action: block
+    on: request
+
+  - name: block-base64-payloads
+    description: "Block large base64 blobs that may encode sensitive data"
+    condition:
+      type: regex
+      pattern: "[A-Za-z0-9+/]{200,}={0,2}"
+    action: block
+    on: request
+```
+
+These patterns are especially important for agent systems where the agent constructs prompts from internal data sources. Without these guards, an agent could inadvertently include database credentials, internal service URLs, or encoded payloads in its LLM request.
+
+### Rate limit by agent with policy tagging
+
+If you want to track which agents are generating the most policy violations without blocking them, use `tag` policies to annotate audit log entries. This is useful during a rollout period when you want to understand traffic patterns before enforcing hard limits.
+
+```yaml
+policies:
+  - name: tag-high-volume-patterns
+    description: "Tag requests over 10k characters for volume analysis"
+    condition:
+      type: length_exceeds
+      max_length: 10000
+    action: tag
+    on: request
+
+  - name: tag-injection-attempts
+    description: "Tag requests with any injection signal for analysis"
+    condition:
+      type: injection_score
+      threshold: 0.3
+    action: tag
+    on: request
+```
+
+Combined with audit logging, these tags let you query which agents trigger which policies and how often, giving you data to set appropriate thresholds before switching from `tag`/`warn` to `block`.
+
+---
+
 ## Example: Layered Security
 
-Combine multiple policies for defense in depth:
+This example combines multiple patterns into a defense-in-depth configuration. Policies are ordered so that cheap checks run first and expensive checks run later.
 
 ```yaml
 policies:
@@ -212,7 +382,15 @@ policies:
     action: block
     on: request
 
-  # Layer 5: Redact PII from responses
+  # Layer 5: Block internal data leakage
+  - name: block-api-keys
+    condition:
+      type: regex
+      pattern: "(sk-[a-zA-Z0-9]{32,}|ghp_[a-zA-Z0-9]{36})"
+    action: block
+    on: request
+
+  # Layer 6: Redact PII from responses
   - name: redact-pii
     condition:
       type: pii_detected
@@ -221,5 +399,13 @@ policies:
         - phone
         - ssn
     action: redact
+    on: response
+
+  # Layer 7: Warn on long responses
+  - name: warn-long-response
+    condition:
+      type: length_exceeds
+      max_length: 50000
+    action: warn
     on: response
 ```
