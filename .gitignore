@@ -22,3 +22,4 @@ Thumbs.db
 
 # Enterprise (separate repo)
 packages/enterprise/
+.superpowers/

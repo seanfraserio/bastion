@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 220" fill="none">
+  <defs>
+    <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Shield outline -->
+  <path
+    d="M100 12 L172 44 C172 44 176 120 100 200 C24 120 28 44 28 44 Z"
+    stroke="url(#grad)"
+    stroke-width="11"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+    fill="none"
+  />
+
+  <!-- Entry arrow (triangle pointing down into shield) -->
+  <polygon points="100,28 91,16 109,16" fill="url(#grad)"/>
+
+  <!-- Pipeline vertical connector lines -->
+  <line x1="100" y1="38" x2="100" y2="56" stroke="url(#grad)" stroke-width="2.5" opacity="0.9"/>
+  <line x1="100" y1="74" x2="100" y2="90" stroke="url(#grad)" stroke-width="2.5" opacity="0.75"/>
+  <line x1="100" y1="106" x2="100" y2="120" stroke="url(#grad)" stroke-width="2.5" opacity="0.6"/>
+  <line x1="100" y1="134" x2="100" y2="148" stroke="url(#grad)" stroke-width="2.5" opacity="0.45"/>
+
+  <!-- Node 1 (top, largest) -->
+  <circle cx="100" cy="65" r="9" fill="url(#grad)" opacity="1"/>
+
+  <!-- Node 2 -->
+  <circle cx="100" cy="98" r="8" fill="url(#grad)" opacity="0.8"/>
+
+  <!-- Node 3 -->
+  <circle cx="100" cy="128" r="7" fill="url(#grad)" opacity="0.6"/>
+
+  <!-- Node 4 (bottom, smallest) -->
+  <circle cx="100" cy="155" r="6" fill="url(#grad)" opacity="0.4"/>
+
+  <!-- Side inspection branch 1: Node 1 → right -->
+  <line x1="109" y1="65" x2="135" y2="65" stroke="url(#grad)" stroke-width="1.8" opacity="0.5"/>
+  <circle cx="139" cy="65" r="4" fill="url(#grad)" opacity="0.45"/>
+
+  <!-- Side inspection branch 2: Node 2 → left -->
+  <line x1="91" y1="98" x2="65" y2="98" stroke="url(#grad)" stroke-width="1.8" opacity="0.4"/>
+  <circle cx="61" cy="98" r="4" fill="url(#grad)" opacity="0.35"/>
+
+  <!-- Side inspection branch 3: Node 3 → right -->
+  <line x1="107" y1="128" x2="130" y2="128" stroke="url(#grad)" stroke-width="1.8" opacity="0.3"/>
+  <circle cx="134" cy="128" r="4" fill="url(#grad)" opacity="0.28"/>
+
+  <!-- Exit arrow (triangle pointing down out of shield) -->
+  <polygon points="100,196 91,182 109,182" fill="url(#grad)" opacity="0.55"/>
+</svg>
