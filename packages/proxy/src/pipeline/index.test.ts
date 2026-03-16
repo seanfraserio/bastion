@@ -6,32 +6,7 @@ import type {
   PipelineMiddlewareResult,
   NormalizedResponse,
 } from "./types.js";
-
-function makeMockContext(
-  overrides: Partial<PipelineContext> = {},
-): PipelineContext {
-  return {
-    id: "test-id",
-    requestId: "req-1",
-    environment: "test",
-    provider: "anthropic",
-    model: "claude-sonnet-4-6",
-    startTime: Date.now(),
-    request: {
-      model: "claude-sonnet-4-6",
-      messages: [
-        { role: "user", content: "Hello", rawContent: "Hello" },
-      ],
-      stream: false,
-      rawBody: {},
-    },
-    decisions: [],
-    cacheHit: false,
-    fallbackUsed: false,
-    metadata: {},
-    ...overrides,
-  };
-}
+import { makeMockContext } from "../__tests__/helpers/mock-context.js";
 
 function makeMockResponse(): NormalizedResponse {
   return {

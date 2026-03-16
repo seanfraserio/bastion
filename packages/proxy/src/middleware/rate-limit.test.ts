@@ -1,31 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { RateLimitMiddleware } from "./rate-limit.js";
-import type { PipelineContext } from "../pipeline/types.js";
 import type { BastionConfig } from "@openbastion-ai/config";
-
-function makeMockContext(overrides: Partial<PipelineContext> = {}): PipelineContext {
-  return {
-    id: "test-id",
-    requestId: "req-1",
-    environment: "test",
-    provider: "anthropic",
-    model: "claude-sonnet-4-6",
-    startTime: Date.now(),
-    request: {
-      model: "claude-sonnet-4-6",
-      messages: [
-        { role: "user", content: "Hello", rawContent: "Hello" },
-      ],
-      stream: false,
-      rawBody: {},
-    },
-    decisions: [],
-    cacheHit: false,
-    fallbackUsed: false,
-    metadata: {},
-    ...overrides,
-  };
-}
+import { makeMockContext } from "../__tests__/helpers/mock-context.js";
 
 function makeMockConfig(
   overrides: Partial<BastionConfig["rate_limits"]> = {},

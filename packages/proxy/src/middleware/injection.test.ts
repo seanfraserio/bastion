@@ -3,19 +3,14 @@ import {
   InjectionDetectorMiddleware,
   scoreInjection,
 } from "./injection.js";
+import { makeMockContext as makeMockContextBase } from "../__tests__/helpers/mock-context.js";
 import type { PipelineContext } from "../pipeline/types.js";
 
 function makeMockContext(
   userContent: string,
   overrides: Partial<PipelineContext> = {},
 ): PipelineContext {
-  return {
-    id: "test-id",
-    requestId: "req-1",
-    environment: "test",
-    provider: "anthropic",
-    model: "claude-sonnet-4-6",
-    startTime: Date.now(),
+  return makeMockContextBase({
     request: {
       model: "claude-sonnet-4-6",
       messages: [
@@ -24,12 +19,8 @@ function makeMockContext(
       stream: false,
       rawBody: {},
     },
-    decisions: [],
-    cacheHit: false,
-    fallbackUsed: false,
-    metadata: {},
     ...overrides,
-  };
+  });
 }
 
 describe("scoreInjection", () => {

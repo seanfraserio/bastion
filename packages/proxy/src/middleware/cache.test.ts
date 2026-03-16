@@ -1,33 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { CacheMiddleware } from "./cache.js";
-import type { PipelineContext, NormalizedResponse } from "../pipeline/types.js";
+import type { NormalizedResponse } from "../pipeline/types.js";
 import type { BastionConfig } from "@openbastion-ai/config";
-
-function makeMockContext(overrides: Partial<PipelineContext> = {}): PipelineContext {
-  return {
-    id: "test-id",
-    requestId: "req-1",
-    environment: "test",
-    provider: "anthropic",
-    model: "claude-sonnet-4-6",
-    startTime: Date.now(),
-    request: {
-      model: "claude-sonnet-4-6",
-      messages: [
-        { role: "user", content: "Hello", rawContent: "Hello" },
-      ],
-      temperature: 0.7,
-      maxTokens: 1024,
-      stream: false,
-      rawBody: {},
-    },
-    decisions: [],
-    cacheHit: false,
-    fallbackUsed: false,
-    metadata: {},
-    ...overrides,
-  };
-}
+import { makeMockContext } from "../__tests__/helpers/mock-context.js";
 
 function makeMockResponse(): NormalizedResponse {
   return {

@@ -45,5 +45,8 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Test
+      - name: Test with coverage
         run: pnpm test
+
+      - name: Security audit
+        run: pnpm audit --audit-level=high || true
