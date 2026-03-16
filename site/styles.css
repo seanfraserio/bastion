@@ -502,6 +502,7 @@ section {
   font-size: 13px;
   line-height: 1.7;
   color: var(--text-dimmed);
+  white-space: pre;
 }
 
 .code-block .comment {
