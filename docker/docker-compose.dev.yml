@@ -4,7 +4,8 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     ports:
-      - "4000:4000"
+      # Bound to localhost for security. Change to "4000:4000" to expose to network.
+      - "127.0.0.1:4000:4000"
     volumes:
       - ../bastion.yaml:/app/bastion.yaml:ro
       - ../logs:/app/logs

@@ -7,13 +7,11 @@ export interface HealthResponse {
 export interface StatsResponse {
   totalRequests: number;
   blockedRequests: number;
-  cacheHits: number;
-  cacheMisses: number;
-  cacheHitRate: number;
-  totalInputTokens: number;
-  totalOutputTokens: number;
-  totalEstimatedCostUsd: number;
-  providerBreakdown: Record<string, { requests: number; tokens: number }>;
+  errors: number;
+  cache: {
+    size: number;
+    totalHits: number;
+  };
 }
 
 export interface BastionClientOptions {

@@ -89,7 +89,7 @@ function getTextField(
   const responseText = ctx.response?.content ?? "";
 
   if (field === "all") {
-    return phase === "request" ? requestText : responseText;
+    return [requestText, responseText].filter(Boolean).join("\n");
   }
   if (field === "prompt") {
     return requestText;

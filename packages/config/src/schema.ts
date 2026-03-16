@@ -174,6 +174,12 @@ export const bastionConfigSchema = z.object({
   policies: z.array(policySchema).optional(),
   audit: auditSchema.optional(),
   lantern: lanternSchema.optional(),
-});
+}).refine(
+  (data) => data.providers.primary in data.providers.definitions,
+  { message: "providers.primary must reference a provider defined in providers.definitions" },
+).refine(
+  (data) => !data.providers.fallback || data.providers.fallback in data.providers.definitions,
+  { message: "providers.fallback must reference a provider defined in providers.definitions" },
+);
 
 export type BastionConfig = z.infer<typeof bastionConfigSchema>;

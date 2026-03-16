@@ -144,6 +144,16 @@ export async function createServer(configPath?: string) {
     configPath ?? process.env.BASTION_CONFIG ?? "./bastion.yaml";
   const config = await loadConfig(resolvedPath);
 
+  // Warn if PII detection policies are configured (enterprise-only feature)
+  const hasPiiPolicies = config.policies?.some(
+    (p) => p.condition.type === "pii_detected",
+  );
+  if (hasPiiPolicies) {
+    console.warn(
+      "[bastion] WARNING: PII detection policies are configured but require Bastion Enterprise. PII policies will have no effect in the OSS version.",
+    );
+  }
+
   const app = Fastify({
     logger: { level: config.proxy.log_level },
   });

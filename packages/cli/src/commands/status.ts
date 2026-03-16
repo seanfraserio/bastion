@@ -10,13 +10,11 @@ interface HealthResponse {
 interface StatsResponse {
   totalRequests: number;
   blockedRequests: number;
-  cacheHits: number;
-  cacheMisses: number;
-  cacheHitRate: number;
-  totalInputTokens: number;
-  totalOutputTokens: number;
-  totalEstimatedCostUsd: number;
-  providerBreakdown: Record<string, { requests: number; tokens: number }>;
+  errors: number;
+  cache: {
+    size: number;
+    totalHits: number;
+  };
 }
 
 function formatUptime(seconds: number): string {
@@ -59,21 +57,11 @@ export function registerStatusCommand(program: Command): void {
           console.log("\n=== Request Stats ===");
           console.log(`  Total requests:    ${stats.totalRequests}`);
           console.log(`  Blocked requests:  ${stats.blockedRequests}`);
-          console.log(`  Cache hits:        ${stats.cacheHits}`);
-          console.log(`  Cache misses:      ${stats.cacheMisses}`);
-          console.log(`  Cache hit rate:    ${(stats.cacheHitRate * 100).toFixed(1)}%`);
+          console.log(`  Errors:            ${stats.errors}`);
 
-          console.log("\n=== Token Usage ===");
-          console.log(`  Input tokens:      ${stats.totalInputTokens}`);
-          console.log(`  Output tokens:     ${stats.totalOutputTokens}`);
-          console.log(`  Estimated cost:    $${stats.totalEstimatedCostUsd.toFixed(4)}`);
-
-          if (Object.keys(stats.providerBreakdown).length > 0) {
-            console.log("\n=== Provider Breakdown ===");
-            for (const [provider, data] of Object.entries(stats.providerBreakdown)) {
-              console.log(`  ${provider}: ${data.requests} requests, ${data.tokens} tokens`);
-            }
-          }
+          console.log("\n=== Cache Stats ===");
+          console.log(`  Cache size:        ${stats.cache.size}`);
+          console.log(`  Cache total hits:  ${stats.cache.totalHits}`);
         } catch {
           // Stats endpoint may not be available
           console.log("\n(Stats endpoint not available)");

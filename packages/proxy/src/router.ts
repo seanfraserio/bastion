@@ -12,13 +12,13 @@ export function routeToProvider(
   path: string,
   config: BastionConfig,
 ): ProviderName {
-  if (path === "/v1/messages" || path.startsWith("/v1/messages")) {
+  if (path === "/v1/messages" || path.startsWith("/v1/messages/")) {
     return "anthropic";
   }
 
   if (
     path === "/v1/chat/completions" ||
-    path.startsWith("/v1/chat/completions")
+    path.startsWith("/v1/chat/completions/")
   ) {
     return "openai";
   }

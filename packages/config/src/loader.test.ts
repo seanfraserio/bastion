@@ -143,7 +143,7 @@ providers:
     const filePath = writeTempYaml("missing-env.yaml", yamlWithMissingEnv);
 
     await expect(loadConfig(filePath)).rejects.toThrow(
-      /BASTION_NONEXISTENT_VAR.*is not set/,
+      /Missing required environment variable in configuration/,
     );
   });
 

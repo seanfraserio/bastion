@@ -78,9 +78,13 @@ export class AuditMiddleware implements PipelineMiddleware {
     switch (this.output) {
       case "file": {
         if (this.filePath) {
-          const dir = path.dirname(this.filePath);
+          const resolvedPath = path.resolve(this.filePath);
+          if (this.filePath.includes("..")) {
+            console.warn(`[bastion] Audit log path contains '..': ${resolvedPath}. Ensure this is intentional.`);
+          }
+          const dir = path.dirname(resolvedPath);
           await fs.promises.mkdir(dir, { recursive: true });
-          await fs.promises.appendFile(this.filePath, jsonLine + "\n", "utf-8");
+          await fs.promises.appendFile(resolvedPath, jsonLine + "\n", "utf-8");
         }
         break;
       }
