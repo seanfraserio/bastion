@@ -4,6 +4,8 @@ import { authenticateControlPlane } from "./auth.js";
 import { tenantPublicRoutes, tenantAuthRoutes } from "./routes/tenants.js";
 import { configRoutes } from "./routes/configs.js";
 import { usageRoutes } from "./routes/usage.js";
+import { auditRoutes } from "./routes/audit.js";
+import { teamRoutes } from "./routes/team.js";
 
 export async function createControlPlane() {
   const app = Fastify({
@@ -34,6 +36,8 @@ export async function createControlPlane() {
     await authedApp.register(tenantAuthRoutes);
     await authedApp.register(configRoutes);
     await authedApp.register(usageRoutes);
+    await authedApp.register(auditRoutes);
+    await authedApp.register(teamRoutes);
   });
 
   return app;

@@ -62,6 +62,17 @@ export async function initializeDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_tenants_proxy_key ON tenants(proxy_key_hash);
     CREATE INDEX IF NOT EXISTS idx_tenants_api_key ON tenants(api_key_hash);
     CREATE INDEX IF NOT EXISTS idx_tenants_email ON tenants(email);
+    CREATE TABLE IF NOT EXISTS team_members (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+      user_email TEXT NOT NULL,
+      role TEXT DEFAULT 'member' CHECK (role IN ('admin', 'member')),
+      invited_at TIMESTAMPTZ DEFAULT NOW(),
+      accepted_at TIMESTAMPTZ,
+      UNIQUE(tenant_id, user_email)
+    );
+    CREATE INDEX IF NOT EXISTS idx_team_members_tenant ON team_members(tenant_id);
+    CREATE INDEX IF NOT EXISTS idx_team_members_email ON team_members(user_email);
   `;
   await getPool().query(schema);
 }
