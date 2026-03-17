@@ -11,29 +11,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 
 export default function LoginPage() {
-  const [email, setEmail] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(false);
-  const [emailSent, setEmailSent] = React.useState(false);
 
   async function handleOAuthSignIn(provider: string) {
     setIsLoading(true);
     try {
       await signIn(provider, { callbackUrl: "/" });
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function handleEmailSignIn(e: React.FormEvent) {
-    e.preventDefault();
-    if (!email) return;
-    setIsLoading(true);
-    try {
-      await signIn("nodemailer", { email, callbackUrl: "/" });
-      setEmailSent(true);
     } finally {
       setIsLoading(false);
     }
@@ -100,41 +85,6 @@ export default function LoginPage() {
             </svg>
             Continue with GitHub
           </Button>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">
-                or continue with email
-              </span>
-            </div>
-          </div>
-
-          {emailSent ? (
-            <div className="rounded-md bg-bastion-purple/10 p-4 text-center text-sm text-bastion-purple-light">
-              Check your email for a magic link to sign in.
-            </div>
-          ) : (
-            <form onSubmit={handleEmailSignIn} className="space-y-3">
-              <Input
-                type="email"
-                placeholder="name@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading}
-                required
-              />
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isLoading || !email}
-              >
-                Send magic link
-              </Button>
-            </form>
-          )}
         </CardContent>
       </Card>
     </div>
