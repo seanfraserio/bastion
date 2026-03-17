@@ -4,6 +4,7 @@ import * as React from "react";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CheckCircle, BookOpen, Mail, Github, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TenantForm } from "@/components/settings/tenant-form";
@@ -22,6 +23,7 @@ export default function SettingsPage() {
 
 function SettingsContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [tenantName, setTenantName] = React.useState(mockTenant.name);
   const [showBillingSuccess, setShowBillingSuccess] = React.useState(false);
   const plan = planDetails[mockTenant.plan];
@@ -40,8 +42,14 @@ function SettingsContent() {
   }
 
   function handleDelete() {
-    // In production, this would call the API and redirect
-    console.log("Tenant deletion requested");
+    // In production, this would call DELETE /tenants/me
+    alert(
+      "Tenant deletion requested. In production, this would call DELETE /tenants/me."
+    );
+    // Simulate account deletion: redirect to login after a brief delay
+    setTimeout(() => {
+      router.push("/login");
+    }, 1500);
   }
 
   return (

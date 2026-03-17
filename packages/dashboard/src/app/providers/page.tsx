@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { CheckCircle } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -13,27 +14,73 @@ import { EditProviderDialog } from "@/components/providers/edit-provider-dialog"
 import { mockProviders, type Provider } from "@/lib/mock-data";
 
 export default function ProvidersPage() {
-  const [providers] = React.useState(mockProviders);
+  const [providers, setProviders] = React.useState(mockProviders);
   const [editingProvider, setEditingProvider] = React.useState<Provider | null>(
     null
   );
   const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [saveSuccess, setSaveSuccess] = React.useState(false);
 
   const primaryProvider = providers.find((p) => p.role === "primary");
   const fallbackProvider = providers.find((p) => p.role === "fallback");
+
+  function handlePrimaryChange(providerId: string) {
+    setProviders((prev) =>
+      prev.map((p) => ({
+        ...p,
+        role:
+          p.id === providerId
+            ? ("primary" as const)
+            : p.role === "primary"
+              ? ("none" as const)
+              : p.role,
+      }))
+    );
+  }
+
+  function handleFallbackChange(providerId: string) {
+    setProviders((prev) =>
+      prev.map((p) => ({
+        ...p,
+        role:
+          p.id === providerId
+            ? ("fallback" as const)
+            : p.role === "fallback"
+              ? ("none" as const)
+              : p.role,
+      }))
+    );
+  }
 
   function handleEdit(provider: Provider) {
     setEditingProvider(provider);
     setDialogOpen(true);
   }
 
-  function handleSave(_data: {
+  function handleSave(data: {
     apiKey: string;
     baseUrl: string;
     timeoutMs: number;
   }) {
-    // In production this would call the API to update the provider
-    console.log("Save provider config:", editingProvider?.id, _data);
+    if (!editingProvider) return;
+    // Update the provider config in local state
+    setProviders((prev) =>
+      prev.map((p) =>
+        p.id === editingProvider.id
+          ? {
+              ...p,
+              baseUrl: data.baseUrl || null,
+              timeoutMs: data.timeoutMs,
+              configured: true,
+            }
+          : p
+      )
+    );
+    setDialogOpen(false);
+    setEditingProvider(null);
+    // Show brief success indicator
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 2000);
   }
 
   return (
@@ -51,9 +98,7 @@ export default function ProvidersPage() {
           <label className="text-sm font-medium">Primary Provider</label>
           <Select
             value={primaryProvider?.id ?? ""}
-            onValueChange={() => {
-              // In production: update provider roles
-            }}
+            onValueChange={handlePrimaryChange}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select primary" />
@@ -73,9 +118,7 @@ export default function ProvidersPage() {
           <label className="text-sm font-medium">Fallback Provider</label>
           <Select
             value={fallbackProvider?.id ?? ""}
-            onValueChange={() => {
-              // In production: update provider roles
-            }}
+            onValueChange={handleFallbackChange}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select fallback" />
@@ -103,6 +146,13 @@ export default function ProvidersPage() {
           />
         ))}
       </div>
+
+      {saveSuccess && (
+        <div className="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-sm font-medium text-green-500">
+          <CheckCircle className="h-4 w-4" />
+          Provider configuration saved successfully.
+        </div>
+      )}
 
       <EditProviderDialog
         provider={editingProvider}

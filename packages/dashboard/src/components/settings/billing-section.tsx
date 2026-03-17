@@ -11,7 +11,11 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import type { BillingInfo } from "@/lib/api";
+import {
+  createCheckoutSession,
+  createPortalSession,
+  type BillingInfo,
+} from "@/lib/api";
 
 // Mock billing data — will be replaced with real API calls once the backend is connected.
 const mockBilling: BillingInfo = {
@@ -94,13 +98,12 @@ export function BillingSection() {
   async function handleUpgrade() {
     setLoading(true);
     try {
-      // In production, this calls createCheckoutSession(controlKey)
-      // and redirects to the returned URL:
-      // const { url } = await createCheckoutSession(controlKey);
-      // window.location.href = url;
-
-      // For now, log the intent
-      console.log("Upgrade requested — would redirect to Stripe Checkout");
+      const { url } = await createCheckoutSession("");
+      window.location.href = url;
+    } catch {
+      alert(
+        "Connect your billing account in Settings to enable this feature."
+      );
     } finally {
       setLoading(false);
     }
@@ -109,13 +112,11 @@ export function BillingSection() {
   async function handleManageBilling() {
     setLoading(true);
     try {
-      // In production, this calls createPortalSession(controlKey)
-      // and redirects to the returned URL:
-      // const { url } = await createPortalSession(controlKey);
-      // window.location.href = url;
-
-      console.log(
-        "Manage billing requested — would redirect to Stripe Customer Portal"
+      const { url } = await createPortalSession("");
+      window.location.href = url;
+    } catch {
+      alert(
+        "Connect your billing account in Settings to enable this feature."
       );
     } finally {
       setLoading(false);

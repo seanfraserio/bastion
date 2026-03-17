@@ -14,7 +14,7 @@ import {
 import { mockPolicies, type Policy } from "@/lib/mock-data";
 
 export default function PoliciesPage() {
-  const [policies] = React.useState(mockPolicies);
+  const [policies, setPolicies] = React.useState(mockPolicies);
   const [editingPolicy, setEditingPolicy] = React.useState<Policy | null>(null);
   const [isCreating, setIsCreating] = React.useState(false);
 
@@ -33,7 +33,7 @@ export default function PoliciesPage() {
 
   function handleDelete(id: string) {
     // In production this would call the API
-    console.log("Delete policy:", id);
+    setPolicies((prev) => prev.filter((p) => p.id !== id));
   }
 
   function handleSave(
