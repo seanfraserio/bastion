@@ -24,6 +24,6 @@ Thumbs.db
 packages/enterprise/
 packages/cloud/
 packages/dashboard/
-site/enterprise/
+site/
 .superpowers/
 docs/superpowers/
