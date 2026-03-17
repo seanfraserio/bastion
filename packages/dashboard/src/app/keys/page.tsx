@@ -1,11 +1,18 @@
+"use client";
+
+import * as React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { KeysTable } from "@/components/keys/keys-table";
 import { GenerateKeyDialog } from "@/components/keys/generate-key-dialog";
 import { RotateKeyDialog } from "@/components/keys/rotate-key-dialog";
-import { mockApiKeys } from "@/lib/mock-data";
+import { mockApiKeys, type ApiKey } from "@/lib/mock-data";
 
 export default function KeysPage() {
-  const keys = mockApiKeys;
+  const [keys, setKeys] = React.useState<ApiKey[]>(mockApiKeys);
+
+  function handleDelete(id: string) {
+    setKeys((prev) => prev.filter((k) => k.id !== id));
+  }
 
   return (
     <div className="space-y-6">
@@ -27,7 +34,7 @@ export default function KeysPage() {
           <CardTitle className="text-lg">Active Keys</CardTitle>
         </CardHeader>
         <CardContent>
-          <KeysTable keys={keys} />
+          <KeysTable keys={keys} onDelete={handleDelete} />
         </CardContent>
       </Card>
     </div>
