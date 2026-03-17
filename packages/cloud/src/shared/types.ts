@@ -50,6 +50,12 @@ export interface TenantBastionConfig {
     action: "block" | "warn" | "redact" | "tag";
     condition: Record<string, unknown>;
   }>;
+  lantern?: {
+    enabled: boolean;
+    endpoint: string;
+    agent_name?: string;
+    api_key?: string;
+  };
 }
 
 export interface UsageRecord {

@@ -130,6 +130,32 @@ export async function createDataPlane() {
         ]
       ).catch((err: Error) => console.error("Failed to log usage:", err.message));
 
+      // Emit Lantern trace if enabled
+      if (tenantConfig.lantern?.enabled && tenantConfig.lantern.endpoint) {
+        const span = {
+          type: "llm_call",
+          agentName: tenantConfig.lantern.agent_name ?? "bastion-proxy",
+          inputTokens,
+          outputTokens,
+          model: (body as any).model ?? "unknown",
+          durationMs,
+          metadata: {
+            provider,
+            tenantId: tenant.id,
+            cacheHit: false,
+          },
+        };
+        const lanternHeaders: Record<string, string> = { "Content-Type": "application/json" };
+        if (tenantConfig.lantern.api_key) {
+          lanternHeaders["Authorization"] = `Bearer ${tenantConfig.lantern.api_key}`;
+        }
+        fetch(tenantConfig.lantern.endpoint, {
+          method: "POST",
+          headers: lanternHeaders,
+          body: JSON.stringify(span),
+        }).catch(() => {}); // fire and forget
+      }
+
       return reply.code(response.status).send(responseBody);
     } catch (err) {
       const durationMs = Date.now() - startTime;
