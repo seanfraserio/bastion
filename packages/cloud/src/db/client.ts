@@ -77,6 +77,20 @@ export async function initializeDatabase(): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS idx_team_members_tenant ON team_members(tenant_id);
     CREATE INDEX IF NOT EXISTS idx_team_members_email ON team_members(user_email);
+
+    -- Migrations for existing databases
+    DO $$ BEGIN
+      ALTER TABLE tenants ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;
+    EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+    DO $$ BEGIN
+      ALTER TABLE tenants ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT;
+    EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+    DO $$ BEGIN
+      ALTER TABLE tenants ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '14 days');
+    EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+    DO $$ BEGIN
+      ALTER TABLE tenants ADD COLUMN IF NOT EXISTS subscription_status TEXT DEFAULT 'trialing';
+    EXCEPTION WHEN duplicate_column THEN NULL; END $$;
   `;
   await getPool().query(schema);
 }
