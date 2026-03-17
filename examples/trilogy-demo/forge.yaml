@@ -1,0 +1,23 @@
+version: "1"
+
+agent:
+  name: trilogy-demo
+  description: "Demo agent showing Forge + Bastion + Lantern working together"
+
+model:
+  provider: anthropic
+  name: claude-haiku-4-5-20251001
+  base_url: "http://localhost:4000"    # Bastion proxy
+  temperature: 0.3
+  max_tokens: 1024
+
+system_prompt:
+  inline: |
+    You are a helpful assistant that demonstrates the Forge/Bastion/Lantern
+    trilogy. You answer questions concisely and accurately.
+
+environments:
+  production:
+    model:
+      base_url: "https://proxy.openbastionai.org"
+      temperature: 0.1

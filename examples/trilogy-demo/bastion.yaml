@@ -1,0 +1,48 @@
+version: "1"
+
+proxy:
+  port: 4000
+  host: "127.0.0.1"
+  log_level: info
+
+providers:
+  primary: anthropic
+  definitions:
+    anthropic:
+      api_key: "${ANTHROPIC_API_KEY}"
+      timeout_ms: 30000
+
+cache:
+  enabled: true
+  strategy: exact
+  ttl_seconds: 3600
+  max_entries: 10000
+
+rate_limits:
+  enabled: true
+  requests_per_minute: 100
+
+policies:
+  - name: "block-injection"
+    on: request
+    action: block
+    condition:
+      type: injection_score
+      threshold: 0.7
+
+  - name: "warn-long-response"
+    on: response
+    action: warn
+    condition:
+      type: length_exceeds
+      field: response
+      value: 5000
+
+audit:
+  enabled: true
+  output: stdout
+
+lantern:
+  enabled: true
+  endpoint: "http://localhost:3000/v1/traces"
+  agent_name: "trilogy-demo"
