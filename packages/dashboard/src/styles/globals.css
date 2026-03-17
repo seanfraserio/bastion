@@ -58,3 +58,105 @@ html {
     @apply bg-background text-foreground;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Markdown article styles (Documentation page)
+   --------------------------------------------------------------------------- */
+
+.md-article {
+  @apply leading-7 text-foreground;
+}
+
+.md-article h1 {
+  @apply mb-4 border-b pb-3 text-2xl font-bold tracking-tight;
+}
+
+.md-article h2 {
+  @apply mb-3 mt-8 border-b pb-2 text-xl font-bold;
+}
+
+.md-article h3 {
+  @apply mb-2 mt-6 text-lg font-semibold;
+}
+
+.md-article h4 {
+  @apply mb-2 mt-5 text-base font-semibold;
+}
+
+.md-article h5 {
+  @apply mb-1 mt-4 text-sm font-semibold;
+}
+
+.md-article h6 {
+  @apply mb-1 mt-4 text-sm font-medium text-muted-foreground;
+}
+
+.md-article p {
+  @apply mb-3;
+}
+
+.md-article a {
+  @apply font-medium text-bastion-purple underline underline-offset-2 hover:text-bastion-purple-light;
+}
+
+.md-article strong {
+  @apply font-semibold;
+}
+
+.md-article ul,
+.md-article ol {
+  @apply mb-3 pl-6;
+}
+
+.md-article ul {
+  @apply list-disc;
+}
+
+.md-article ol {
+  @apply list-decimal;
+}
+
+.md-article li {
+  @apply my-1;
+}
+
+.md-article blockquote {
+  @apply my-3 rounded-r-md border-l-[3px] border-bastion-purple bg-secondary px-4 py-2 text-muted-foreground;
+}
+
+.md-article table {
+  @apply my-3 w-full border-collapse text-sm;
+}
+
+.md-article td,
+.md-article th {
+  @apply border px-3 py-2 text-left;
+}
+
+.md-article tr:nth-child(odd) {
+  @apply bg-secondary/50;
+}
+
+.md-article hr {
+  @apply my-6 border-border;
+}
+
+.md-code-block {
+  @apply my-3 overflow-x-auto rounded-lg border p-4 font-mono text-sm leading-relaxed;
+  background: #13161c;
+  color: #e2e8f0;
+}
+
+:root .md-code-block {
+  background: #f4f4f5;
+  color: #1e293b;
+}
+
+.dark .md-code-block {
+  background: #13161c;
+  color: #e2e8f0;
+}
+
+.md-inline-code {
+  @apply rounded bg-secondary px-1.5 py-0.5 font-mono text-sm;
+}

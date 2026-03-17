@@ -14,13 +14,11 @@ import {
   Users,
   BookOpen,
   LifeBuoy,
-  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
   { name: "Overview", href: "/", icon: LayoutDashboard },
-  { name: "API Keys", href: "/keys", icon: Key },
   { name: "Policies", href: "/policies", icon: Shield },
   { name: "Providers", href: "/providers", icon: Server },
   { name: "Usage", href: "/usage", icon: BarChart3 },
@@ -28,20 +26,11 @@ const navigation = [
 ];
 
 const bottomNavigation = [
-  {
-    name: "Documentation",
-    href: "https://openbastionai.org",
-    icon: BookOpen,
-    external: true,
-  },
-  {
-    name: "Support",
-    href: "mailto:support@openbastionai.org",
-    icon: LifeBuoy,
-    external: true,
-  },
-  { name: "Settings", href: "/settings", icon: Settings, external: false },
-  { name: "Team", href: "/settings/team", icon: Users, external: false },
+  { name: "Documentation", href: "/docs", icon: BookOpen },
+  { name: "Support", href: "/support", icon: LifeBuoy },
+  { name: "API Keys", href: "/keys", icon: Key },
+  { name: "Settings", href: "/settings", icon: Settings },
+  { name: "Team", href: "/settings/team", icon: Users },
 ];
 
 export function Sidebar() {
@@ -86,25 +75,9 @@ export function Sidebar() {
 
         {bottomNavigation.map((item) => {
           const isActive =
-            !item.external && (item.href === "/"
+            item.href === "/"
               ? pathname === "/"
-              : pathname.startsWith(item.href));
-
-          if (item.external) {
-            return (
-              <a
-                key={item.href}
-                href={item.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-              >
-                <item.icon className="h-5 w-5" />
-                {item.name}
-                <ExternalLink className="ml-auto h-3 w-3 opacity-50" />
-              </a>
-            );
-          }
+              : pathname.startsWith(item.href);
 
           return (
             <Link
