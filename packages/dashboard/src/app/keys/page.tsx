@@ -11,7 +11,7 @@ export default function KeysPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">API Keys</h1>
+          <h1 className="text-2xl font-bold tracking-tight">API Keys</h1>
           <p className="text-muted-foreground">
             Manage proxy and control API keys for your tenant.
           </p>

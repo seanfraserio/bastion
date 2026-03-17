@@ -14,10 +14,10 @@ export function StatCard({ title, value, subtitle, trend, icon: Icon }: StatCard
   return (
     <Card>
       <CardContent className="p-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between">
           <div className="space-y-1">
             <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            <p className="text-3xl font-bold tracking-tight">{value}</p>
+            <p className="text-2xl font-bold tracking-tight">{value}</p>
             {subtitle && (
               <p className="text-xs text-muted-foreground">{subtitle}</p>
             )}
@@ -38,7 +38,7 @@ export function StatCard({ title, value, subtitle, trend, icon: Icon }: StatCard
               </div>
             )}
           </div>
-          <div className="rounded-lg bg-bastion-purple/10 p-3">
+          <div className="shrink-0 rounded-lg bg-bastion-purple/10 p-3">
             <Icon className="h-6 w-6 text-bastion-purple" />
           </div>
         </div>

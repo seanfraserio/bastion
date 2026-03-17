@@ -10,6 +10,9 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 export const metadata: Metadata = {
   title: "Bastion Dashboard",
   description: "Enterprise dashboard for Bastion AI gateway",
+  icons: {
+    icon: "/logo.svg",
+  },
 };
 
 export default function RootLayout({

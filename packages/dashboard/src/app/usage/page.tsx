@@ -32,7 +32,7 @@ export default function UsagePage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Usage Analytics</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Usage Analytics</h1>
           <p className="text-muted-foreground">
             Monitor API usage, token consumption, and estimated costs.
           </p>

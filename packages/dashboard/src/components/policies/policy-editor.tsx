@@ -11,6 +11,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { YamlPreview } from "@/components/policies/yaml-preview";
+import {
+  validatePolicy,
+  ValidationMessage,
+  PolicyTestPanel,
+  type PolicyDraft,
+  type ValidationError,
+} from "@/components/policies/policy-validator";
 import { type Policy } from "@/lib/mock-data";
 
 type Trigger = "request" | "response" | "both";
@@ -66,6 +73,9 @@ export function PolicyEditor({
     String(initialPolicy?.condition?.value ?? "50000")
   );
 
+  // Track whether the user has interacted (to avoid showing errors on load)
+  const [touched, setTouched] = React.useState(false);
+
   function buildCondition(): Record<string, unknown> {
     switch (conditionType) {
       case "contains":
@@ -81,6 +91,33 @@ export function PolicyEditor({
     }
   }
 
+  // Build the draft for validation and test purposes
+  const draft: PolicyDraft = React.useMemo(() => {
+    const condition = buildCondition();
+    return {
+      name,
+      trigger,
+      action,
+      conditionType,
+      condition: {
+        type: conditionType,
+        field: condition.field as string | undefined,
+        value: condition.value as string | number | undefined,
+        case_sensitive: condition.case_sensitive as boolean | undefined,
+        threshold: condition.threshold as number | undefined,
+        entities: condition.entities as string[] | undefined,
+      },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, trigger, action, conditionType, field, value, caseSensitive, threshold, piiEntities, lengthValue]);
+
+  const validationErrors: ValidationError[] = React.useMemo(
+    () => validatePolicy(draft),
+    [draft]
+  );
+
+  const hasErrors = validationErrors.length > 0;
+
   const previewPolicy = {
     name,
     trigger,
@@ -90,6 +127,8 @@ export function PolicyEditor({
   };
 
   function handleSave() {
+    setTouched(true);
+    if (hasErrors) return;
     onSave?.({
       name,
       trigger,
@@ -101,12 +140,16 @@ export function PolicyEditor({
   }
 
   function togglePiiEntity(entity: string) {
+    setTouched(true);
     setPiiEntities((prev) =>
       prev.includes(entity)
         ? prev.filter((e) => e !== entity)
         : [...prev, entity]
     );
   }
+
+  // Helper to show errors only after user interaction
+  const displayErrors = touched ? validationErrors : [];
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -117,9 +160,13 @@ export function PolicyEditor({
           <label className="text-sm font-medium">Name</label>
           <Input
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => {
+              setName(e.target.value);
+              setTouched(true);
+            }}
             placeholder="e.g. Block prompt injection"
           />
+          <ValidationMessage errors={displayErrors} field="name" />
         </div>
 
         {/* Trigger */}
@@ -127,7 +174,10 @@ export function PolicyEditor({
           <label className="text-sm font-medium">Trigger</label>
           <Select
             value={trigger}
-            onValueChange={(v) => setTrigger(v as Trigger)}
+            onValueChange={(v) => {
+              setTrigger(v as Trigger);
+              setTouched(true);
+            }}
           >
             <SelectTrigger>
               <SelectValue />
@@ -138,6 +188,7 @@ export function PolicyEditor({
               <SelectItem value="both">Both</SelectItem>
             </SelectContent>
           </Select>
+          <ValidationMessage errors={displayErrors} field="trigger" />
         </div>
 
         {/* Action */}
@@ -145,7 +196,10 @@ export function PolicyEditor({
           <label className="text-sm font-medium">Action</label>
           <Select
             value={action}
-            onValueChange={(v) => setAction(v as Action)}
+            onValueChange={(v) => {
+              setAction(v as Action);
+              setTouched(true);
+            }}
           >
             <SelectTrigger>
               <SelectValue />
@@ -157,6 +211,7 @@ export function PolicyEditor({
               <SelectItem value="tag">Tag</SelectItem>
             </SelectContent>
           </Select>
+          <ValidationMessage errors={displayErrors} field="action" />
         </div>
 
         {/* Condition Type */}
@@ -164,7 +219,10 @@ export function PolicyEditor({
           <label className="text-sm font-medium">Condition Type</label>
           <Select
             value={conditionType}
-            onValueChange={(v) => setConditionType(v as ConditionType)}
+            onValueChange={(v) => {
+              setConditionType(v as ConditionType);
+              setTouched(true);
+            }}
           >
             <SelectTrigger>
               <SelectValue />
@@ -177,6 +235,7 @@ export function PolicyEditor({
               <SelectItem value="length_exceeds">Length Exceeds</SelectItem>
             </SelectContent>
           </Select>
+          <ValidationMessage errors={displayErrors} field="conditionType" />
         </div>
 
         {/* Dynamic condition fields */}
@@ -204,13 +263,17 @@ export function PolicyEditor({
               </label>
               <Input
                 value={value}
-                onChange={(e) => setValue(e.target.value)}
+                onChange={(e) => {
+                  setValue(e.target.value);
+                  setTouched(true);
+                }}
                 placeholder={
                   conditionType === "regex"
                     ? "e.g. (?i)drop\\s+table"
                     : "e.g. competitor-product"
                 }
               />
+              <ValidationMessage errors={displayErrors} field="value" />
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -238,12 +301,16 @@ export function PolicyEditor({
               max="1"
               step="0.05"
               value={threshold}
-              onChange={(e) => setThreshold(e.target.value)}
+              onChange={(e) => {
+                setThreshold(e.target.value);
+                setTouched(true);
+              }}
             />
             <p className="text-xs text-muted-foreground">
               Requests with an injection confidence score above this threshold
               will trigger the policy action.
             </p>
+            <ValidationMessage errors={displayErrors} field="threshold" />
           </div>
         )}
 
@@ -266,6 +333,7 @@ export function PolicyEditor({
                 </button>
               ))}
             </div>
+            <ValidationMessage errors={displayErrors} field="entities" />
           </div>
         )}
 
@@ -292,15 +360,25 @@ export function PolicyEditor({
                 type="number"
                 min="0"
                 value={lengthValue}
-                onChange={(e) => setLengthValue(e.target.value)}
+                onChange={(e) => {
+                  setLengthValue(e.target.value);
+                  setTouched(true);
+                }}
               />
+              <ValidationMessage errors={displayErrors} field="lengthValue" />
             </div>
           </>
         )}
 
+        {/* Test Policy panel */}
+        <PolicyTestPanel draft={draft} />
+
         {/* Actions */}
         <div className="flex gap-2 pt-2">
-          <Button onClick={handleSave} disabled={!name.trim()}>
+          <Button
+            onClick={handleSave}
+            disabled={touched && hasErrors}
+          >
             {initialPolicy ? "Update Policy" : "Save Policy"}
           </Button>
           {onCancel && (
