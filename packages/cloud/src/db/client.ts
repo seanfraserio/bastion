@@ -36,7 +36,11 @@ export async function initializeDatabase(): Promise<void> {
       plan TEXT DEFAULT 'team' CHECK (plan IN ('free', 'team', 'enterprise')),
       status TEXT DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'deleted')),
       created_at TIMESTAMPTZ DEFAULT NOW(),
-      updated_at TIMESTAMPTZ DEFAULT NOW()
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      stripe_customer_id TEXT,
+      stripe_subscription_id TEXT,
+      trial_ends_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '14 days'),
+      subscription_status TEXT DEFAULT 'trialing' CHECK (subscription_status IN ('trialing', 'active', 'past_due', 'canceled', 'unpaid'))
     );
     CREATE TABLE IF NOT EXISTS tenant_configs (
       tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,

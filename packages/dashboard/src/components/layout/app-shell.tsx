@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
+import { UpgradeBanner } from "./upgrade-banner";
 
 const NO_SHELL_PATHS = ["/login", "/onboarding"];
 
@@ -19,6 +20,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <div className="flex flex-1 flex-col pl-64">
         <Topbar />
+        <UpgradeBanner />
         <main className="flex-1 p-6">{children}</main>
       </div>
     </div>

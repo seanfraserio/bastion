@@ -24,7 +24,7 @@ export async function tenantPublicRoutes(app: FastifyInstance): Promise<void> {
     const result = await query(
       `INSERT INTO tenants (name, email, api_key_hash, proxy_key_hash, provider_keys, plan)
        VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, name, email, plan, status`,
+       RETURNING id, name, email, plan, status, trial_ends_at, subscription_status`,
       [name, email, hashApiKey(controlKey), hashApiKey(proxyKey), JSON.stringify(providerKeys || {}), plan || "team"]
     );
 
@@ -43,7 +43,7 @@ export async function tenantPublicRoutes(app: FastifyInstance): Promise<void> {
     );
 
     const response: CreateTenantResponse = {
-      tenant: { id: tenant.id, name: tenant.name, email: tenant.email, plan: tenant.plan, status: tenant.status },
+      tenant: { id: tenant.id, name: tenant.name, email: tenant.email, plan: tenant.plan, status: tenant.status, trialEndsAt: tenant.trial_ends_at, subscriptionStatus: tenant.subscription_status },
       controlKey,
       proxyKey,
     };

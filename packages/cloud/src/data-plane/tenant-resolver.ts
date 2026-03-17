@@ -24,6 +24,7 @@ export async function resolveTenant(proxyKey: string): Promise<ResolvedTenant | 
   const result = await query(
     `SELECT t.id, t.name, t.email, t.api_key_hash, t.proxy_key_hash,
             t.provider_keys, t.plan, t.status, t.created_at, t.updated_at,
+            t.subscription_status, t.trial_ends_at, t.stripe_customer_id,
             tc.config
      FROM tenants t
      JOIN tenant_configs tc ON tc.tenant_id = t.id
@@ -45,6 +46,9 @@ export async function resolveTenant(proxyKey: string): Promise<ResolvedTenant | 
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    subscriptionStatus: row.subscription_status,
+    trialEndsAt: row.trial_ends_at ? new Date(row.trial_ends_at) : null,
+    stripeCustomerId: row.stripe_customer_id,
   };
 
   const config: TenantBastionConfig = typeof row.config === "string" ? JSON.parse(row.config) : row.config;

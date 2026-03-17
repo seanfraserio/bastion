@@ -362,3 +362,34 @@ export function removeTeamMember(
     controlKey,
   });
 }
+
+// ---------- Billing ----------
+
+export interface BillingInfo {
+  plan: string;
+  subscriptionStatus: "trialing" | "active" | "past_due" | "canceled" | "incomplete" | null;
+  trialEndsAt: string | null;
+  trialDaysRemaining: number | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+}
+
+export interface CheckoutSessionResponse {
+  url: string;
+}
+
+export interface PortalSessionResponse {
+  url: string;
+}
+
+export function getBilling(controlKey: string): Promise<BillingInfo> {
+  return apiClient<BillingInfo>("/tenants/me/billing", { controlKey });
+}
+
+export function createCheckoutSession(controlKey: string): Promise<CheckoutSessionResponse> {
+  return apiClient<CheckoutSessionResponse>("/tenants/me/billing/checkout", { method: "POST", controlKey });
+}
+
+export function createPortalSession(controlKey: string): Promise<PortalSessionResponse> {
+  return apiClient<PortalSessionResponse>("/tenants/me/billing/portal", { method: "POST", controlKey });
+}

@@ -6,6 +6,8 @@ import { configRoutes } from "./routes/configs.js";
 import { usageRoutes } from "./routes/usage.js";
 import { auditRoutes } from "./routes/audit.js";
 import { teamRoutes } from "./routes/team.js";
+import { billingRoutes } from "./routes/billing.js";
+import { webhookRoutes } from "./routes/webhooks.js";
 
 export async function createControlPlane() {
   const app = Fastify({
@@ -30,6 +32,9 @@ export async function createControlPlane() {
   // Public routes (no auth)
   await app.register(tenantPublicRoutes);
 
+  // Webhook routes (no tenant auth — uses Stripe signature verification)
+  await app.register(webhookRoutes);
+
   // Authenticated routes
   app.register(async function authenticatedRoutes(authedApp) {
     authedApp.addHook("onRequest", authenticateControlPlane);
@@ -38,6 +43,7 @@ export async function createControlPlane() {
     await authedApp.register(usageRoutes);
     await authedApp.register(auditRoutes);
     await authedApp.register(teamRoutes);
+    await authedApp.register(billingRoutes);
   });
 
   return app;

@@ -9,6 +9,9 @@ export interface Tenant {
   status: "active" | "suspended" | "deleted";
   createdAt: Date;
   updatedAt: Date;
+  subscriptionStatus?: string;
+  trialEndsAt?: Date | null;
+  stripeCustomerId?: string | null;
 }
 
 export interface ProviderKeys {
@@ -82,7 +85,7 @@ export interface CreateTenantRequest {
 }
 
 export interface CreateTenantResponse {
-  tenant: { id: string; name: string; email: string; plan: string; status: string };
+  tenant: { id: string; name: string; email: string; plan: string; status: string; trialEndsAt: string; subscriptionStatus: string };
   controlKey: string;   // Plaintext, shown only once
   proxyKey: string;     // Plaintext, shown only once
 }

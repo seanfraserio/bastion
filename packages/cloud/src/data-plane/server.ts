@@ -49,6 +49,22 @@ export async function createDataPlane() {
 
     const { tenant, config: tenantConfig } = resolved;
 
+    // Check billing status
+    if (tenant.subscriptionStatus === "canceled" || tenant.subscriptionStatus === "unpaid") {
+      return reply.code(402).send({
+        error: "subscription_required",
+        message: "Your subscription is inactive. Please update your billing.",
+      });
+    }
+
+    const now = new Date();
+    if (tenant.subscriptionStatus === "trialing" && tenant.trialEndsAt && new Date(tenant.trialEndsAt) < now) {
+      return reply.code(402).send({
+        error: "trial_expired",
+        message: "Your free trial has expired. Please subscribe.",
+      });
+    }
+
     // Determine provider from request path
     const path = request.url;
     let provider = tenantConfig.providers.primary;
