@@ -20,6 +20,10 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Enterprise (separate repo)
+# Enterprise (private repos)
 packages/enterprise/
+packages/cloud/
+packages/dashboard/
+site/enterprise/
 .superpowers/
+docs/superpowers/

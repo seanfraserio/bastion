@@ -69,12 +69,8 @@ bastion (monorepo root, pnpm workspaces)
 ├── @openbastion-ai/sdk ──────────── Typed admin API client (health, stats)
 │   └── (standalone -- no internal deps)
 │
-├── @openbastion-ai/enterprise ───── Enterprise features (BUSL-1.1, private)
-│   └── (standalone -- no internal deps)
-│
-└── @openbastion-ai/cloud ────────── Managed multi-tenant cloud proxy (private)
-    ├── depends on @openbastion-ai/proxy
-    └── depends on @openbastion-ai/config
+└── @openbastion-ai/enterprise ───── Enterprise features (BUSL-1.1, private)
+    └── (standalone -- no internal deps)
 ```
 
 | Package | Description |
@@ -83,8 +79,7 @@ bastion (monorepo root, pnpm workspaces)
 | `@openbastion-ai/proxy` | The core proxy server: Fastify HTTP layer, middleware pipeline, provider router with fallback, and all six middleware stages. |
 | `@openbastion-ai/cli` | Commander-based CLI exposing `bastion start`, `bastion validate`, `bastion test`, and `bastion status` commands. |
 | `@openbastion-ai/sdk` | Zero-dependency TypeScript client for the proxy's admin API (`/health`, `/stats`). |
-| `@openbastion-ai/enterprise` | Enterprise-only features under BUSL-1.1: ML PII detection, LLM injection scoring, SIEM export, compliance reports, team RBAC, alerting, cluster sync, and semantic cache. |
-| `@openbastion-ai/cloud` | Managed multi-tenant cloud deployment: control plane (tenant CRUD, config management, usage reporting) and data plane (tenant resolution, proxy forwarding, usage logging). |
+| `@openbastion-ai/enterprise` | Enterprise-only features under BUSL-1.1 (private repo). |
 
 ---
 
@@ -451,7 +446,7 @@ Cache keys are scoped by `agentName + teamName + environment` in addition to the
 
 ### API Key Validation
 
-In the cloud deployment, API keys are hashed with SHA-256 before storage. The data plane resolves tenants by comparing the hash of the incoming `bst_proxy_*` key against stored hashes -- raw keys are never persisted.
+API keys are validated at startup to ensure they are configured before making upstream calls.
 
 ### Audit Logging
 
@@ -459,119 +454,7 @@ Every request produces a structured `AuditEntry` (JSONL format) containing: requ
 
 ---
 
-## 8. Cloud Architecture (Managed Proxy)
-
-### Deployment Diagram
-
-```
-┌──────────────────┐       ┌──────────────────────────────────┐       ┌──────────────────┐
-│   Tenant App     │       │         Data Plane               │       │   LLM Provider   │
-│                  │       │         (Cloud Run)               │       │                  │
-│  Authorization:  │──────▶│                                  │──────▶│  Anthropic /     │
-│  Bearer          │       │  1. Extract bst_proxy_* key      │       │  OpenAI          │
-│  bst_proxy_*     │       │  2. Hash key, query tenants DB   │       │                  │
-│                  │       │  3. Load tenant config (cached)  │       └──────────────────┘
-└──────────────────┘       │  4. Resolve provider + API key   │
-                           │  5. Forward to LLM provider      │
-                           │  6. Log usage (fire-and-forget)  │
-                           │                                  │
-                           └──────────────┬───────────────────┘
-                                          │
-                           ┌──────────────▼───────────────────┐
-                           │       Cloud SQL (Postgres)        │
-                           │                                  │
-                           │  tenants           (identity)    │
-                           │  tenant_configs    (per-tenant)  │
-                           │  usage_logs        (metering)    │
-                           └──────────────▲───────────────────┘
-                                          │
-                           ┌──────────────┴───────────────────┐
-                           │       Control Plane               │
-                           │       (Cloud Run)                 │
-                           │                                  │
-                           │  POST   /tenants          signup │
-                           │  GET    /tenants/me       info   │
-                           │  DELETE /tenants/me       delete │
-                           │  POST   /tenants/me/rotate-keys  │
-                           │  PUT    /config           update │
-                           │  GET    /usage            query  │
-                           │                                  │
-                           └──────────────────────────────────┘
-```
-
-### Tenant Lifecycle
-
-1. **Signup**: `POST /tenants` creates a new tenant with a generated `bst_ctrl_*` (control key) and `bst_proxy_*` (proxy key). Both keys are hashed before storage; plaintext keys are returned once.
-2. **Configure**: Authenticated calls to `PUT /config` update the tenant's `bastion.yaml`-equivalent configuration stored as JSONB in `tenant_configs`.
-3. **Proxy**: The tenant's application sends LLM requests to the data plane with `Authorization: Bearer bst_proxy_*`. The data plane resolves the tenant (with a 60-second in-memory cache), loads their config, and forwards to the appropriate provider using the tenant's own provider API keys.
-4. **Usage Tracking**: Every request is logged to `usage_logs` with provider, model, token counts, cost estimate, status, and duration.
-5. **Key Rotation**: `POST /tenants/me/rotate-keys` generates new control and proxy keys, invalidating the old ones immediately.
-
-### Tenant Resolution
-
-The `resolveTenant()` function performs a JOIN query across `tenants` and `tenant_configs`, filtered by `proxy_key_hash` and `status = 'active'`. Results are cached in-memory for 60 seconds to minimize database load on the hot path.
-
----
-
-## 9. Enterprise Features Architecture
-
-The `@openbastion-ai/enterprise` package provides capabilities beyond the open-source proxy, licensed under BUSL-1.1:
-
-### ML PII Detection
-
-- **Regex-based entity recognition** detecting: email, phone, SSN, credit card (with Luhn validation), and contextual names.
-- Returns `PiiEntity[]` with type, value, position, and confidence score.
-- Four redaction strategies: `mask` (`[EMAIL_REDACTED]`), `hash` (SHA-256 prefix), `tokenize` (reversible UUID tokens), and `remove`.
-
-### LLM Injection Scoring
-
-- Calls an external LLM classifier (Anthropic Claude Haiku or OpenAI GPT-4o-mini) to score injection likelihood (0.0-1.0) with confidence and reasoning.
-- Uses Anthropic prompt caching (`cache_control: { type: "ephemeral" }`) to reduce cost for repeated scoring.
-- Results are cached in-memory for 60 seconds keyed on SHA-256 of input text.
-- Fails safe: returns `{ score: 0, confidence: 0 }` on any error.
-
-### SIEM Export
-
-- **Splunk HEC** adapter: batches events as newline-delimited JSON with `Authorization: Splunk <token>`.
-- **Elastic Bulk** adapter: formats events as bulk index operations with `Authorization: ApiKey <token>`.
-- Configurable batch size and flush interval with exponential backoff retry (3 attempts).
-
-### Compliance Reports
-
-- **SOC 2** report generation mapping to controls: CC6.1 (access control), CC7.1 (system monitoring), CC7.2 (anomaly detection), CC8.1 (change management).
-- **HIPAA** report generation mapping to sections: 164.312(b) (audit controls), 164.312(a)(1) (access control), 164.312(e)(1) (transmission security), 164.530(j) (record retention).
-- Both aggregate audit log entries into compliance summaries with severity classifications.
-
-### Team RBAC
-
-- **Policy namespace inheritance**: teams define their own policies and optionally inherit from a base namespace.
-- Team policies override base policies with the same name; unoverridden base policies are inherited.
-- `TeamPolicyManager` supports CRUD operations on team configurations.
-
-### Alerting
-
-- **Slack**: sends Block Kit-formatted messages to a webhook URL.
-- **PagerDuty**: triggers events via the Events API v2 (`https://events.pagerduty.com/v2/enqueue`).
-- **Webhook**: sends structured JSON to any URL with optional Bearer auth.
-- All channels use exponential backoff retry and fail silently (alerting never blocks the pipeline).
-
-### Cluster Sync
-
-- **HTTP peer mesh**: nodes register with each other and broadcast config updates via `POST /cluster/sync`.
-- Periodic health checks (default: 30 seconds) maintain cluster awareness.
-- Nodes track `configVersion` (SHA-256 hash) to detect stale configs.
-- Stale threshold: 3x health interval. Unreachable nodes remain in the list but are marked unhealthy.
-
-### Semantic Cache
-
-- **Embedding-based similarity**: computes vector embeddings via OpenAI's embeddings API (`text-embedding-3-small`).
-- **Cosine similarity** comparison against all cached entries.
-- Returns a cache hit when similarity exceeds the threshold (default: 0.95).
-- TTL-based expiration with oldest-entry eviction at capacity.
-
----
-
-## 10. Trilogy Integration
+## 8. Trilogy Integration
 
 ```
 ┌────────────────┐         ┌────────────────┐         ┌────────────────┐
@@ -606,79 +489,7 @@ The three tools converge on shared identifiers: the `agentName` (set by Forge vi
 
 ---
 
-## 11. Database Schema
-
-The cloud deployment uses PostgreSQL (Cloud SQL) with three tables:
-
-### tenants
-
-```sql
-CREATE TABLE tenants (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name            TEXT NOT NULL,
-  email           TEXT NOT NULL UNIQUE,
-  api_key_hash    TEXT NOT NULL,           -- SHA-256 hash of bst_ctrl_* key
-  proxy_key_hash  TEXT NOT NULL,           -- SHA-256 hash of bst_proxy_* key
-  provider_keys   JSONB DEFAULT '{}',     -- { "anthropic": "sk-...", "openai": "sk-..." }
-  plan            TEXT DEFAULT 'team'      -- CHECK: free | team | enterprise
-                  CHECK (plan IN ('free', 'team', 'enterprise')),
-  status          TEXT DEFAULT 'active'    -- CHECK: active | suspended | deleted
-                  CHECK (status IN ('active', 'suspended', 'deleted')),
-  created_at      TIMESTAMPTZ DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-### tenant_configs
-
-```sql
-CREATE TABLE tenant_configs (
-  tenant_id   UUID REFERENCES tenants(id) ON DELETE CASCADE,
-  config      JSONB NOT NULL,             -- bastion.yaml-equivalent JSON
-  version     INTEGER DEFAULT 1,          -- Config version counter
-  updated_at  TIMESTAMPTZ DEFAULT NOW(),
-  PRIMARY KEY (tenant_id)
-);
-```
-
-### usage_logs
-
-```sql
-CREATE TABLE usage_logs (
-  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id         UUID REFERENCES tenants(id),
-  timestamp         TIMESTAMPTZ DEFAULT NOW(),
-  provider          TEXT NOT NULL,
-  model             TEXT NOT NULL,
-  input_tokens      INTEGER DEFAULT 0,
-  output_tokens     INTEGER DEFAULT 0,
-  estimated_cost_usd NUMERIC(10,6) DEFAULT 0,
-  status            TEXT NOT NULL          -- CHECK: success | blocked | error
-                    CHECK (status IN ('success', 'blocked', 'error')),
-  duration_ms       INTEGER DEFAULT 0,
-  cache_hit         BOOLEAN DEFAULT FALSE
-);
-```
-
-### Indexes
-
-```sql
-CREATE INDEX idx_usage_tenant_time ON usage_logs(tenant_id, timestamp);
-CREATE INDEX idx_tenants_proxy_key ON tenants(proxy_key_hash);
-CREATE INDEX idx_tenants_api_key   ON tenants(api_key_hash);
-CREATE INDEX idx_tenants_email     ON tenants(email);
-```
-
-### Relationships
-
-```
-tenants (1) ──── (1) tenant_configs    (1:1, CASCADE delete)
-tenants (1) ──── (N) usage_logs        (1:N, tenant_id FK)
-```
-
----
-
-## 12. Testing Architecture
+## 9. Testing Architecture
 
 ### Test Pyramid
 
@@ -699,7 +510,6 @@ The test suite spans 38 test files across all six packages:
 | `@openbastion-ai/cli` | 4 | start, validate, test, status commands |
 | `@openbastion-ai/sdk` | 1 | BastionClient health/stats API |
 | `@openbastion-ai/enterprise` | 10 | PII detector, PII redactor, injection scorer, SIEM exporter, compliance reports, RBAC policies, alerting webhooks, cluster sync, semantic cache |
-| `@openbastion-ai/cloud` | 1 | API key hashing |
 
 ### Testing Tools
 
