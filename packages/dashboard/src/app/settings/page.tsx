@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle, BookOpen, Mail, Github, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +12,14 @@ import { DangerZone } from "@/components/settings/danger-zone";
 import { mockTenant, planDetails } from "@/lib/mock-data";
 
 export default function SettingsPage() {
+  return (
+    <Suspense fallback={<div className="p-8">Loading...</div>}>
+      <SettingsContent />
+    </Suspense>
+  );
+}
+
+function SettingsContent() {
   const searchParams = useSearchParams();
   const [tenantName, setTenantName] = React.useState(mockTenant.name);
   const [showBillingSuccess, setShowBillingSuccess] = React.useState(false);
