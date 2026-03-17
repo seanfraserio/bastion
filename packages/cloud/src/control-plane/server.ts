@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import { initializeDatabase } from "../db/client.js";
 import { authenticateControlPlane } from "./auth.js";
-import { tenantRoutes } from "./routes/tenants.js";
+import { tenantPublicRoutes, tenantAuthRoutes } from "./routes/tenants.js";
 import { configRoutes } from "./routes/configs.js";
 import { usageRoutes } from "./routes/usage.js";
 
@@ -25,12 +25,13 @@ export async function createControlPlane() {
   // Health check (no auth)
   app.get("/health", async () => ({ status: "ok", service: "bastion-control-plane" }));
 
-  // Tenant signup (no auth)
-  await app.register(tenantRoutes);
+  // Public routes (no auth)
+  await app.register(tenantPublicRoutes);
 
   // Authenticated routes
   app.register(async function authenticatedRoutes(authedApp) {
     authedApp.addHook("onRequest", authenticateControlPlane);
+    await authedApp.register(tenantAuthRoutes);
     await authedApp.register(configRoutes);
     await authedApp.register(usageRoutes);
   });

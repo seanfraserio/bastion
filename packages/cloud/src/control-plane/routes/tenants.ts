@@ -3,7 +3,7 @@ import { query } from "../../db/client.js";
 import { generateApiKey, hashApiKey } from "../../shared/api-keys.js";
 import { CreateTenantRequest, CreateTenantResponse } from "../../shared/types.js";
 
-export async function tenantRoutes(app: FastifyInstance): Promise<void> {
+export async function tenantPublicRoutes(app: FastifyInstance): Promise<void> {
   // Create tenant (no auth — this is the signup endpoint)
   app.post<{ Body: CreateTenantRequest }>("/tenants", async (request, reply) => {
     const { name, email, providerKeys, plan } = request.body;
@@ -51,6 +51,9 @@ export async function tenantRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(201).send(response);
   });
 
+}
+
+export async function tenantAuthRoutes(app: FastifyInstance): Promise<void> {
   // Get current tenant (requires auth)
   app.get("/tenants/me", async (request, reply) => {
     const tenant = (request as any).tenant;
