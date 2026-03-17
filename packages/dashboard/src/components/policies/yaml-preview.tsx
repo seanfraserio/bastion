@@ -1,5 +1,3 @@
-import { type Policy } from "@/lib/mock-data";
-
 interface YamlPreviewProps {
   policy: {
     name: string;

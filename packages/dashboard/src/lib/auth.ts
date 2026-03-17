@@ -1,7 +1,7 @@
 import NextAuth from "next-auth";
+import type { Provider } from "next-auth/providers";
 import Google from "next-auth/providers/google";
 import GitHub from "next-auth/providers/github";
-import Nodemailer from "next-auth/providers/nodemailer";
 
 declare module "next-auth" {
   interface Session {
@@ -14,35 +14,39 @@ declare module "next-auth" {
       controlKey?: string;
     };
   }
-
   interface User {
     tenantId?: string;
     controlKey?: string;
   }
 }
 
-declare module "next-auth" {
-  interface JWT {
-    tenantId?: string;
-    controlKey?: string;
-  }
-}
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    }),
-    GitHub({
-      clientId: process.env.GITHUB_CLIENT_ID,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET,
-    }),
+// Build providers list dynamically
+const providers: Provider[] = [
+  Google({
+    clientId: process.env.GOOGLE_CLIENT_ID ?? "",
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+  }),
+  GitHub({
+    clientId: process.env.GITHUB_CLIENT_ID ?? "",
+    clientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
+  }),
+];
+
+// Only add email provider when EMAIL_SERVER is configured
+if (process.env.EMAIL_SERVER) {
+  // Dynamic import avoided — use Nodemailer only when configured
+  const Nodemailer = require("next-auth/providers/nodemailer").default;
+  providers.push(
     Nodemailer({
       server: process.env.EMAIL_SERVER,
       from: process.env.EMAIL_FROM,
-    }),
-  ],
+    })
+  );
+}
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  providers,
   session: {
     strategy: "jwt",
   },
