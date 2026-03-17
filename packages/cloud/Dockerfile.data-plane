@@ -5,7 +5,7 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY tsconfig.base.json ./
 COPY packages/ packages/
 RUN pnpm install --frozen-lockfile || pnpm install
-RUN pnpm build
+RUN pnpm --filter @openbastion-ai/config build && pnpm --filter @openbastion-ai/proxy build && pnpm --filter @openbastion-ai/cloud build
 
 FROM node:20-alpine
 WORKDIR /app
