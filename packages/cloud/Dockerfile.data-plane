@@ -9,11 +9,8 @@ RUN pnpm build
 
 FROM node:20-alpine
 WORKDIR /app
-COPY --from=builder /app/packages/cloud/dist ./dist
-COPY --from=builder /app/packages/cloud/src/db/schema.sql ./dist/db/schema.sql
-COPY --from=builder /app/packages/cloud/package.json ./package.json
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages/cloud/node_modules ./packages/cloud/node_modules
+COPY --from=builder /app ./
+RUN rm -rf packages/*/src packages/*/*.ts .eslintrc.js
 ENV PORT=8080
 EXPOSE 8080
-CMD ["node", "dist/index.js", "--data-plane"]
+CMD ["node", "packages/cloud/dist/start-data-plane.js"]

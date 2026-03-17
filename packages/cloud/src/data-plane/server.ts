@@ -10,7 +10,17 @@ export async function createDataPlane() {
     logger: { level: process.env.LOG_LEVEL || "info" },
   });
 
-  await initializeDatabase();
+  // Initialize database with retry (Cloud SQL proxy may take a moment)
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      await initializeDatabase();
+      break;
+    } catch (err) {
+      console.warn(`Database init attempt ${attempt}/5 failed:`, (err as Error).message);
+      if (attempt === 5) throw err;
+      await new Promise((r) => setTimeout(r, attempt * 2000));
+    }
+  }
 
   // Health check
   app.get("/health", async () => ({ status: "ok", service: "bastion-data-plane" }));
@@ -126,14 +136,3 @@ export async function createDataPlane() {
   return app;
 }
 
-// Entry point for Cloud Run
-if (process.argv[1]?.includes("data-plane")) {
-  const port = parseInt(process.env.PORT || "8080", 10);
-  const host = process.env.HOST || "0.0.0.0";
-
-  createDataPlane().then((app) => {
-    app.listen({ port, host }).then(() => {
-      console.log(`Bastion Data Plane running on http://${host}:${port}`);
-    });
-  });
-}

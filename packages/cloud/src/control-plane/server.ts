@@ -10,8 +10,17 @@ export async function createControlPlane() {
     logger: { level: process.env.LOG_LEVEL || "info" },
   });
 
-  // Initialize database
-  await initializeDatabase();
+  // Initialize database with retry (Cloud SQL proxy may take a moment)
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      await initializeDatabase();
+      break;
+    } catch (err) {
+      console.warn(`Database init attempt ${attempt}/5 failed:`, (err as Error).message);
+      if (attempt === 5) throw err;
+      await new Promise((r) => setTimeout(r, attempt * 2000));
+    }
+  }
 
   // Health check (no auth)
   app.get("/health", async () => ({ status: "ok", service: "bastion-control-plane" }));
@@ -29,14 +38,3 @@ export async function createControlPlane() {
   return app;
 }
 
-// Entry point for Cloud Run
-if (process.argv[1]?.includes("control-plane")) {
-  const port = parseInt(process.env.PORT || "8080", 10);
-  const host = process.env.HOST || "0.0.0.0";
-
-  createControlPlane().then((app) => {
-    app.listen({ port, host }).then(() => {
-      console.log(`Bastion Control Plane running on http://${host}:${port}`);
-    });
-  });
-}
