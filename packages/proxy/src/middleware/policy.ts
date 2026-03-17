@@ -1,3 +1,4 @@
+import pino from "pino";
 import type { BastionConfig, Policy, PolicyCondition } from "@openbastion-ai/config";
 import type {
   PipelineContext,
@@ -5,6 +6,8 @@ import type {
   PipelineMiddlewareResult,
   PolicyDecision,
 } from "../pipeline/types.js";
+
+const logger = pino({ name: "bastion:policy" });
 
 /**
  * Check if a regex pattern contains known catastrophic backtracking indicators.
@@ -130,7 +133,7 @@ export class PolicyMiddleware implements PipelineMiddleware {
 
         // Check for catastrophic backtracking
         if (!validateRegexSafety(pattern)) {
-          console.warn(
+          logger.warn(
             `[policy] Unsafe regex pattern in policy "${policy.name}": ` +
             `"${pattern}" contains nested quantifiers that may cause catastrophic backtracking. ` +
             `This policy will be treated as non-matching.`,
@@ -142,7 +145,7 @@ export class PolicyMiddleware implements PipelineMiddleware {
           const re = new RegExp(pattern, flags);
           this.compiledRegexes.set(pattern, re);
         } catch (err) {
-          console.warn(
+          logger.warn(
             `[policy] Invalid regex pattern in policy "${policy.name}": ` +
             `"${pattern}" — ${err instanceof Error ? err.message : String(err)}. ` +
             `This policy will be treated as non-matching.`,

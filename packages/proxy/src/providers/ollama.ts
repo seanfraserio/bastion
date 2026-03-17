@@ -31,6 +31,10 @@ export class OllamaProvider implements IProvider {
     _rawBody: unknown,
     config: ProviderConfig,
   ): Promise<NormalizedResponse> {
+    if (request.stream) {
+      console.warn("[bastion] Ollama provider does not support streaming. Request will be processed as non-streaming.");
+    }
+
     const url = `${config.baseUrl}/api/chat`;
 
     const messages: OllamaMessage[] = [];

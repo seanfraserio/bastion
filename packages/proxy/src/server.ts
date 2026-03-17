@@ -156,6 +156,7 @@ export async function createServer(configPath?: string) {
 
   const app = Fastify({
     logger: { level: config.proxy.log_level },
+    bodyLimit: 10 * 1024 * 1024, // 10MB — generous for multi-turn LLM conversations
   });
 
   let { pipeline, cacheMiddleware } = buildPipeline(config);
@@ -304,6 +305,11 @@ export async function createServer(configPath?: string) {
       );
     }
   });
+
+  // Warn if the proxy is bound to a non-localhost address without TLS
+  if (config.proxy.host !== "127.0.0.1" && config.proxy.host !== "localhost") {
+    console.warn("[bastion] WARNING: Proxy is bound to a non-localhost address without TLS. Consider using a TLS-terminating reverse proxy.");
+  }
 
   return { app, config };
 }

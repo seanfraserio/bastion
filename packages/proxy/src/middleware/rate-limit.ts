@@ -1,9 +1,12 @@
+import pino from "pino";
 import type { BastionConfig } from "@openbastion-ai/config";
 import type {
   PipelineContext,
   PipelineMiddleware,
   PipelineMiddlewareResult,
 } from "../pipeline/types.js";
+
+const logger = pino({ name: "bastion:rate-limit" });
 
 const MAX_BUCKETS = 10_000;
 
@@ -31,14 +34,14 @@ export class RateLimitMiddleware implements PipelineMiddleware {
 
     // Warn if tokens_per_minute is configured globally
     if (rl?.tokens_per_minute) {
-      console.warn("Warning: tokens_per_minute is not yet enforced. Only requests_per_minute is active.");
+      logger.warn("Warning: tokens_per_minute is not yet enforced. Only requests_per_minute is active.");
     }
 
     if (rl?.agents) {
       for (const agent of rl.agents) {
         // Warn if tokens_per_minute is configured per agent
         if (agent.tokens_per_minute) {
-          console.warn(`Warning: tokens_per_minute is not yet enforced. Only requests_per_minute is active.`);
+          logger.warn(`Warning: tokens_per_minute is not yet enforced. Only requests_per_minute is active.`);
         }
         this.agentOverrides.set(agent.name, {
           rpm: agent.requests_per_minute,

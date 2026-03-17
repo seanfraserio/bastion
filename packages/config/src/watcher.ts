@@ -20,7 +20,9 @@ export function watchConfig(
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   const watcher = fs.watch(filePath, (eventType: string) => {
-    if (eventType !== "change") return;
+    // Handle both "change" and "rename" events — some editors (Vim, IntelliJ)
+    // save by writing to a temp file and renaming.
+    if (eventType !== "change" && eventType !== "rename") return;
 
     if (timer) {
       clearTimeout(timer);

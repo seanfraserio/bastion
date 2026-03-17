@@ -1,5 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import pino from "pino";
 import type { BastionConfig } from "@openbastion-ai/config";
 import type {
   PipelineContext,
@@ -7,6 +8,8 @@ import type {
   PipelineMiddlewareResult,
   AuditEntry,
 } from "../pipeline/types.js";
+
+const logger = pino({ name: "bastion:audit" });
 
 export class AuditMiddleware implements PipelineMiddleware {
   readonly name = "audit";
@@ -29,7 +32,7 @@ export class AuditMiddleware implements PipelineMiddleware {
 
     // Warn if Lantern endpoint uses insecure HTTP
     if (this.lanternEnabled && this.lanternEndpoint && this.lanternEndpoint.startsWith("http://")) {
-      console.warn("Warning: Lantern endpoint is using insecure http://. Consider using https:// instead.");
+      logger.warn("Warning: Lantern endpoint is using insecure http://. Consider using https:// instead.");
     }
   }
 
@@ -80,7 +83,7 @@ export class AuditMiddleware implements PipelineMiddleware {
         if (this.filePath) {
           const resolvedPath = path.resolve(this.filePath);
           if (this.filePath.includes("..")) {
-            console.warn(`[bastion] Audit log path contains '..': ${resolvedPath}. Ensure this is intentional.`);
+            logger.warn(`[bastion] Audit log path contains '..': ${resolvedPath}. Ensure this is intentional.`);
           }
           const dir = path.dirname(resolvedPath);
           await fs.promises.mkdir(dir, { recursive: true });
@@ -90,7 +93,7 @@ export class AuditMiddleware implements PipelineMiddleware {
       }
 
       case "stdout": {
-        console.log(jsonLine);
+        logger.info(jsonLine);
         break;
       }
 
@@ -112,7 +115,7 @@ export class AuditMiddleware implements PipelineMiddleware {
         headers,
         body: jsonLine,
       }).catch((err) => {
-        console.warn(`Failed to send audit span to Lantern: ${String(err)}`);
+        logger.warn(`Failed to send audit span to Lantern: ${String(err)}`);
       });
     }
 
