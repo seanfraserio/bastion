@@ -86,8 +86,14 @@ export class AuditMiddleware implements PipelineMiddleware {
             logger.warn(`[bastion] Audit log path contains '..': ${resolvedPath}. Ensure this is intentional.`);
           }
           const dir = path.dirname(resolvedPath);
-          await fs.promises.mkdir(dir, { recursive: true });
-          await fs.promises.appendFile(resolvedPath, jsonLine + "\n", "utf-8");
+          // Fire-and-forget: ensure directory exists then append (don't block response)
+          fs.promises.mkdir(dir, { recursive: true }).then(() => {
+            fs.promises.appendFile(resolvedPath, jsonLine + "\n", "utf-8").catch((err) => {
+              logger.error({ err }, "Failed to write audit log");
+            });
+          }).catch((err) => {
+            logger.error({ err }, "Failed to create audit log directory");
+          });
         }
         break;
       }
