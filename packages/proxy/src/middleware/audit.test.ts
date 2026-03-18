@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { makeMockContext } from "../__tests__/helpers/mock-context.js";
 import type { BastionConfig } from "@openbastion-ai/config";
-import * as fs from "node:fs";
+import type { IAuditExporter } from "../exporters/types.js";
+import type { AuditEntry } from "../pipeline/types.js";
 
-// Mock pino so we can capture logger.info / logger.warn calls
+// Mock pino so we can capture logger.warn calls (used by Lantern warnings)
 const { mockInfo, mockWarn, mockError } = vi.hoisted(() => ({
   mockInfo: vi.fn(),
   mockWarn: vi.fn(),
@@ -40,6 +41,19 @@ function makeConfig(overrides?: Partial<BastionConfig>): BastionConfig {
   } as BastionConfig;
 }
 
+function makeMockExporter(): IAuditExporter & { entries: AuditEntry[] } {
+  const entries: AuditEntry[] = [];
+  return {
+    name: "mock",
+    entries,
+    export: vi.fn((entry: AuditEntry) => {
+      entries.push(entry);
+    }),
+    flush: vi.fn().mockResolvedValue(undefined),
+    shutdown: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
 describe("AuditMiddleware", () => {
   let originalFetch: typeof globalThis.fetch;
 
@@ -55,10 +69,11 @@ describe("AuditMiddleware", () => {
     vi.restoreAllMocks();
   });
 
-  describe("stdout output", () => {
-    it("calls logger.info with JSON", async () => {
-      const config = makeConfig({ audit: { enabled: true, output: "stdout", include_request_body: false, include_response_body: false } });
-      const mw = new AuditMiddleware(config);
+  describe("exporter delegation", () => {
+    it("calls exporter.export with the audit entry", async () => {
+      const config = makeConfig();
+      const exporter = makeMockExporter();
+      const mw = new AuditMiddleware(config, exporter);
 
       const ctx = makeMockContext({
         response: {
@@ -73,60 +88,22 @@ describe("AuditMiddleware", () => {
       const result = await mw.process(ctx);
 
       expect(result.action).toBe("continue");
-      expect(mockInfo).toHaveBeenCalledOnce();
+      expect(exporter.export).toHaveBeenCalledOnce();
+      expect(exporter.entries).toHaveLength(1);
 
-      const loggedJson = JSON.parse(mockInfo.mock.calls[0][0]);
-      expect(loggedJson.id).toBe("test-id");
-      expect(loggedJson.provider).toBe("anthropic");
-      expect(loggedJson.model).toBe("claude-sonnet-4-6");
-      expect(loggedJson.status).toBe("success");
-    });
-  });
-
-  describe("file output", () => {
-    it("calls fs.promises.appendFile with JSONL", async () => {
-      const config = makeConfig({
-        audit: {
-          enabled: true,
-          output: "file",
-          file_path: "/tmp/bastion-test-audit.jsonl",
-          include_request_body: false,
-          include_response_body: false,
-        },
-      });
-      const mw = new AuditMiddleware(config);
-
-      const mkdirSpy = vi.spyOn(fs.promises, "mkdir").mockResolvedValue(undefined);
-      const appendSpy = vi.spyOn(fs.promises, "appendFile").mockResolvedValue();
-
-      const ctx = makeMockContext({
-        response: {
-          content: "Hi",
-          stopReason: "end_turn",
-          inputTokens: 10,
-          outputTokens: 5,
-          rawBody: {},
-        },
-      });
-
-      const result = await mw.process(ctx);
-
-      expect(result.action).toBe("continue");
-      expect(appendSpy).toHaveBeenCalledOnce();
-
-      const writtenPath = appendSpy.mock.calls[0][0];
-      expect(String(writtenPath)).toContain("bastion-test-audit.jsonl");
-
-      const writtenData = appendSpy.mock.calls[0][1] as string;
-      const parsed = JSON.parse(writtenData.trim());
-      expect(parsed.id).toBe("test-id");
+      const entry = exporter.entries[0];
+      expect(entry.id).toBe("test-id");
+      expect(entry.provider).toBe("anthropic");
+      expect(entry.model).toBe("claude-sonnet-4-6");
+      expect(entry.status).toBe("success");
     });
   });
 
   describe("AuditEntry fields", () => {
     it("contains all required fields", async () => {
-      const config = makeConfig({ audit: { enabled: true, output: "stdout", include_request_body: false, include_response_body: false } });
-      const mw = new AuditMiddleware(config);
+      const config = makeConfig();
+      const exporter = makeMockExporter();
+      const mw = new AuditMiddleware(config, exporter);
 
       const ctx = makeMockContext({
         inputTokens: 42,
@@ -143,7 +120,7 @@ describe("AuditMiddleware", () => {
 
       await mw.process(ctx);
 
-      const entry = JSON.parse(mockInfo.mock.calls[0][0]);
+      const entry = exporter.entries[0];
       expect(entry).toHaveProperty("id");
       expect(entry).toHaveProperty("timestamp");
       expect(entry).toHaveProperty("environment");
@@ -164,7 +141,8 @@ describe("AuditMiddleware", () => {
   describe("include_request_body flag", () => {
     it("includes rawBody when enabled", async () => {
       const config = makeConfig({ audit: { enabled: true, output: "stdout", include_request_body: true, include_response_body: false } });
-      const mw = new AuditMiddleware(config);
+      const exporter = makeMockExporter();
+      const mw = new AuditMiddleware(config, exporter);
 
       const ctx = makeMockContext({
         request: {
@@ -184,14 +162,15 @@ describe("AuditMiddleware", () => {
 
       await mw.process(ctx);
 
-      const entry = JSON.parse(mockInfo.mock.calls[0][0]);
+      const entry = exporter.entries[0];
       expect(entry.requestBody).toBeDefined();
-      expect(entry.requestBody.model).toBe("claude-sonnet-4-6");
+      expect((entry.requestBody as Record<string, unknown>).model).toBe("claude-sonnet-4-6");
     });
 
     it("omits requestBody when disabled", async () => {
       const config = makeConfig({ audit: { enabled: true, output: "stdout", include_request_body: false, include_response_body: false } });
-      const mw = new AuditMiddleware(config);
+      const exporter = makeMockExporter();
+      const mw = new AuditMiddleware(config, exporter);
 
       const ctx = makeMockContext({
         response: {
@@ -205,7 +184,7 @@ describe("AuditMiddleware", () => {
 
       await mw.process(ctx);
 
-      const entry = JSON.parse(mockInfo.mock.calls[0][0]);
+      const entry = exporter.entries[0];
       expect(entry.requestBody).toBeUndefined();
     });
   });
@@ -213,7 +192,8 @@ describe("AuditMiddleware", () => {
   describe("include_response_body flag", () => {
     it("includes rawBody when enabled", async () => {
       const config = makeConfig({ audit: { enabled: true, output: "stdout", include_request_body: false, include_response_body: true } });
-      const mw = new AuditMiddleware(config);
+      const exporter = makeMockExporter();
+      const mw = new AuditMiddleware(config, exporter);
 
       const ctx = makeMockContext({
         response: {
@@ -227,14 +207,15 @@ describe("AuditMiddleware", () => {
 
       await mw.process(ctx);
 
-      const entry = JSON.parse(mockInfo.mock.calls[0][0]);
+      const entry = exporter.entries[0];
       expect(entry.responseBody).toBeDefined();
-      expect(entry.responseBody.id).toBe("resp-1");
+      expect((entry.responseBody as Record<string, unknown>).id).toBe("resp-1");
     });
 
     it("omits responseBody when disabled", async () => {
       const config = makeConfig({ audit: { enabled: true, output: "stdout", include_request_body: false, include_response_body: false } });
-      const mw = new AuditMiddleware(config);
+      const exporter = makeMockExporter();
+      const mw = new AuditMiddleware(config, exporter);
 
       const ctx = makeMockContext({
         response: {
@@ -248,7 +229,7 @@ describe("AuditMiddleware", () => {
 
       await mw.process(ctx);
 
-      const entry = JSON.parse(mockInfo.mock.calls[0][0]);
+      const entry = exporter.entries[0];
       expect(entry.responseBody).toBeUndefined();
     });
   });
@@ -262,7 +243,8 @@ describe("AuditMiddleware", () => {
         audit: { enabled: true, output: "stdout", include_request_body: false, include_response_body: false },
         lantern: { enabled: true, endpoint: "https://lantern.example.com/spans" },
       });
-      const mw = new AuditMiddleware(config);
+      const exporter = makeMockExporter();
+      const mw = new AuditMiddleware(config, exporter);
 
       const ctx = makeMockContext({
         response: {
@@ -291,7 +273,8 @@ describe("AuditMiddleware", () => {
         audit: { enabled: true, output: "stdout", include_request_body: false, include_response_body: false },
         lantern: { enabled: true, endpoint: "https://lantern.example.com/spans", api_key: "lantern-secret" },
       });
-      const mw = new AuditMiddleware(config);
+      const exporter = makeMockExporter();
+      const mw = new AuditMiddleware(config, exporter);
 
       const ctx = makeMockContext({
         response: {
@@ -314,7 +297,8 @@ describe("AuditMiddleware", () => {
   describe("status determination", () => {
     it("sets status to 'blocked' when a block decision exists", async () => {
       const config = makeConfig({ audit: { enabled: true, output: "stdout", include_request_body: false, include_response_body: false } });
-      const mw = new AuditMiddleware(config);
+      const exporter = makeMockExporter();
+      const mw = new AuditMiddleware(config, exporter);
 
       const ctx = makeMockContext({
         decisions: [
@@ -331,7 +315,7 @@ describe("AuditMiddleware", () => {
 
       await mw.process(ctx);
 
-      const entry = JSON.parse(mockInfo.mock.calls[0][0]);
+      const entry = exporter.entries[0];
       expect(entry.status).toBe("blocked");
     });
   });

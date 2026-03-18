@@ -1,0 +1,46 @@
+import type { IAuditExporter } from "./types.js";
+import type { AuditEntry } from "../pipeline/types.js";
+import fs from "node:fs";
+import path from "node:path";
+import pino from "pino";
+
+const logger = pino({ name: "bastion:exporter:file" });
+
+export class FileExporter implements IAuditExporter {
+  readonly name = "file";
+  private buffer: string[] = [];
+  private timer: ReturnType<typeof setInterval> | null = null;
+  private filePath: string;
+
+  constructor(filePath: string, flushIntervalMs: number = 5000) {
+    this.filePath = path.resolve(filePath);
+    if (filePath.includes("..")) {
+      logger.warn(`Audit log path contains '..': ${this.filePath}`);
+    }
+    // Create directory
+    const dir = path.dirname(this.filePath);
+    fs.promises.mkdir(dir, { recursive: true }).catch(() => {});
+    // Start periodic flush
+    this.timer = setInterval(() => this.flush(), flushIntervalMs);
+    if (this.timer.unref) this.timer.unref();
+  }
+
+  export(entry: AuditEntry): void {
+    this.buffer.push(JSON.stringify(entry));
+  }
+
+  async flush(): Promise<void> {
+    if (this.buffer.length === 0) return;
+    const batch = this.buffer.splice(0);
+    try {
+      await fs.promises.appendFile(this.filePath, batch.join("\n") + "\n", "utf-8");
+    } catch (err) {
+      logger.error({ err }, "Failed to write audit log batch");
+    }
+  }
+
+  async shutdown(): Promise<void> {
+    if (this.timer) clearInterval(this.timer);
+    await this.flush();
+  }
+}

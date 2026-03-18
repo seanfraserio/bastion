@@ -16,6 +16,10 @@ import { PiiRedactMiddleware } from "./middleware/pii-redact.js";
 import { AuditMiddleware } from "./middleware/audit.js";
 import { createProviderRouter } from "./fallback/router.js";
 import { routeToProvider } from "./router.js";
+import type { IAuditExporter } from "./exporters/types.js";
+import { FileExporter } from "./exporters/file.js";
+import { StdoutExporter } from "./exporters/stdout.js";
+import { HttpExporter } from "./exporters/http.js";
 
 const VERSION = "0.1.0";
 
@@ -108,6 +112,18 @@ function buildPipelineContext(
   };
 }
 
+function createAuditExporter(config: BastionConfig): IAuditExporter {
+  switch (config.audit?.output) {
+    case "file":
+      return new FileExporter(config.audit.file_path ?? "./logs/audit.jsonl");
+    case "http":
+      return new HttpExporter(config.audit.endpoint ?? "", config.audit.headers);
+    case "stdout":
+    default:
+      return new StdoutExporter();
+  }
+}
+
 function buildPipeline(config: BastionConfig): { pipeline: Pipeline; cacheMiddleware: CacheMiddleware } {
   const providerRouter = createProviderRouter(config);
   const pipeline = new Pipeline((ctx) => providerRouter.forward(ctx));
@@ -133,7 +149,8 @@ function buildPipeline(config: BastionConfig): { pipeline: Pipeline; cacheMiddle
   pipeline.use(new PiiRedactMiddleware());
 
   if (config.audit?.enabled !== false) {
-    pipeline.use(new AuditMiddleware(config));
+    const exporter = createAuditExporter(config);
+    pipeline.use(new AuditMiddleware(config, exporter));
   }
 
   return { pipeline, cacheMiddleware };

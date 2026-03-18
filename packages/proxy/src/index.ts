@@ -40,5 +40,17 @@ export { PiiRedactMiddleware } from "./middleware/pii-redact.js";
 export { PolicyMiddleware } from "./middleware/policy.js";
 export { AuditMiddleware } from "./middleware/audit.js";
 
+// Exporters
+export type { IAuditExporter } from "./exporters/types.js";
+export { FileExporter } from "./exporters/file.js";
+export { StdoutExporter } from "./exporters/stdout.js";
+export { HttpExporter } from "./exporters/http.js";
+
 // Router
 export { routeToProvider } from "./router.js";
+
+// Cost estimation
+export { estimateCost, getModelCosts, MODEL_COSTS } from "./costs.js";
+
+// Utilities
+export { CachedResolver } from "./utils/cached-resolver.js";

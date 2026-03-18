@@ -5,12 +5,7 @@ import type {
   ProviderConfig,
   ProviderName,
 } from "../pipeline/types.js";
-
-const ANTHROPIC_COSTS: Record<string, { input: number; output: number }> = {
-  "claude-opus-4-6": { input: 15.0, output: 75.0 },
-  "claude-sonnet-4-6": { input: 3.0, output: 15.0 },
-  "claude-haiku-4-5-20251001": { input: 0.8, output: 4.0 },
-};
+import { estimateCost as sharedEstimateCost } from "../costs.js";
 
 interface AnthropicContentBlock {
   type: string;
@@ -115,10 +110,6 @@ export class AnthropicProvider implements IProvider {
   }
 
   estimateCost(inputTokens: number, outputTokens: number, model: string): number {
-    const costs = ANTHROPIC_COSTS[model];
-    if (!costs) {
-      return 0;
-    }
-    return (inputTokens * costs.input + outputTokens * costs.output) / 1_000_000;
+    return sharedEstimateCost(model, inputTokens, outputTokens);
   }
 }

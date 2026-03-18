@@ -1,5 +1,3 @@
-import * as fs from "node:fs";
-import * as path from "node:path";
 import pino from "pino";
 import type { BastionConfig } from "@openbastion-ai/config";
 import type {
@@ -8,6 +6,7 @@ import type {
   PipelineMiddlewareResult,
   AuditEntry,
 } from "../pipeline/types.js";
+import type { IAuditExporter } from "../exporters/types.js";
 
 const logger = pino({ name: "bastion:audit" });
 
@@ -16,16 +15,14 @@ export class AuditMiddleware implements PipelineMiddleware {
   readonly phase = "response" as const;
 
   private config: BastionConfig;
-  private output: "file" | "stdout" | "http";
-  private filePath?: string;
+  private exporter: IAuditExporter;
   private lanternEnabled: boolean;
   private lanternEndpoint?: string;
   private lanternApiKey?: string;
 
-  constructor(config: BastionConfig) {
+  constructor(config: BastionConfig, exporter: IAuditExporter) {
     this.config = config;
-    this.output = config.audit?.output ?? "stdout";
-    this.filePath = config.audit?.file_path;
+    this.exporter = exporter;
     this.lanternEnabled = config.lantern?.enabled ?? false;
     this.lanternEndpoint = config.lantern?.endpoint;
     this.lanternApiKey = config.lantern?.api_key;
@@ -76,38 +73,9 @@ export class AuditMiddleware implements PipelineMiddleware {
 
   async process(ctx: PipelineContext): Promise<PipelineMiddlewareResult> {
     const entry = this.buildAuditEntry(ctx);
-    const jsonLine = JSON.stringify(entry);
 
-    switch (this.output) {
-      case "file": {
-        if (this.filePath) {
-          const resolvedPath = path.resolve(this.filePath);
-          if (this.filePath.includes("..")) {
-            logger.warn(`[bastion] Audit log path contains '..': ${resolvedPath}. Ensure this is intentional.`);
-          }
-          const dir = path.dirname(resolvedPath);
-          // Fire-and-forget: ensure directory exists then append (don't block response)
-          fs.promises.mkdir(dir, { recursive: true }).then(() => {
-            fs.promises.appendFile(resolvedPath, jsonLine + "\n", "utf-8").catch((err) => {
-              logger.error({ err }, "Failed to write audit log");
-            });
-          }).catch((err) => {
-            logger.error({ err }, "Failed to create audit log directory");
-          });
-        }
-        break;
-      }
-
-      case "stdout": {
-        logger.info(jsonLine);
-        break;
-      }
-
-      case "http": {
-        // HTTP output is handled via lantern below
-        break;
-      }
-    }
+    // Fire-and-forget: delegate to the pluggable exporter
+    this.exporter.export(entry);
 
     // Fire-and-forget span to Lantern if enabled
     if (this.lanternEnabled && this.lanternEndpoint) {
@@ -119,7 +87,7 @@ export class AuditMiddleware implements PipelineMiddleware {
       fetch(endpoint, {
         method: "POST",
         headers,
-        body: jsonLine,
+        body: JSON.stringify(entry),
       }).catch((err) => {
         logger.warn(`Failed to send audit span to Lantern: ${String(err)}`);
       });

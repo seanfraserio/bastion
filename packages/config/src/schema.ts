@@ -136,6 +136,8 @@ export const auditSchema = z.object({
   enabled: z.boolean().default(true),
   output: auditOutputSchema.default("file"),
   file_path: z.string().optional(),
+  endpoint: z.string().url().optional(),
+  headers: z.record(z.string(), z.string()).optional(),
   include_request_body: z.boolean().default(false),
   include_response_body: z.boolean().default(false),
 });
