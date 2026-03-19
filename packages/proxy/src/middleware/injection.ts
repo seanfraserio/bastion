@@ -61,11 +61,7 @@ function normalizeForScoring(text: string): string {
 export function scoreInjection(text: string): number {
   if (!text) return 0;
 
-  // Only do expensive NFKC normalization for longer texts (>100 chars).
-  // Short messages are unlikely to contain obfuscated injection attacks.
-  const normalized = text.length > 100
-    ? normalizeForScoring(text)
-    : text.toLowerCase();
+  const normalized = normalizeForScoring(text);
 
   let matchedWeight = 0;
   let totalWeight = 0;

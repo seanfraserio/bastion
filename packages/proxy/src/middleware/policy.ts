@@ -17,10 +17,7 @@ export function validateRegexSafety(pattern: string): boolean {
   // Detect nested quantifiers: a group containing a quantifier, followed by a quantifier
   // e.g. (a+)+, (a+)*, (a*)+, (a*)*,  (a{2,})+, etc.
   const nestedQuantifier = /\([^)]*[+*]\)[+*{]/;
-  if (nestedQuantifier.test(pattern)) {
-    return false;
-  }
-  return true;
+  return !nestedQuantifier.test(pattern);
 }
 
 /**
@@ -80,7 +77,6 @@ function evaluateCondition(
 function getTextField(
   condition: PolicyCondition,
   ctx: PipelineContext,
-  phase: "request" | "response",
 ): string {
   // injection_score and pii_detected don't use field
   if (condition.type === "injection_score" || condition.type === "pii_detected") {
@@ -88,17 +84,20 @@ function getTextField(
   }
 
   const field = condition.field;
-  const requestText = ctx.request.messages.map((m) => m.content).join("\n");
-  const responseText = ctx.response?.content ?? "";
 
-  if (field === "all") {
-    return [requestText, responseText].filter(Boolean).join("\n");
+  if (field === "response") {
+    return ctx.response?.content ?? "";
   }
+
+  const requestText = ctx.request.messages.map((m) => m.content).join("\n");
+
   if (field === "prompt") {
     return requestText;
   }
-  if (field === "response") {
-    return responseText;
+
+  if (field === "all") {
+    const responseText = ctx.response?.content ?? "";
+    return [requestText, responseText].filter(Boolean).join("\n");
   }
 
   return "";
@@ -165,7 +164,7 @@ export class PolicyMiddleware implements PipelineMiddleware {
         continue;
       }
 
-      const text = getTextField(policy.condition, ctx, currentPhase);
+      const text = getTextField(policy.condition, ctx);
       const matched = evaluateCondition(policy.condition, ctx, text, this.compiledRegexes);
 
       const decision: PolicyDecision = {

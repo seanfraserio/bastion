@@ -21,6 +21,7 @@ describe("BastionClient", () => {
     const client = new BastionClient({ baseUrl: "http://localhost:4000/" });
     // Verify by calling health() and checking the URL passed to fetch
     mockFetch.mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve({ status: "ok" }),
     });
     client.health();
@@ -36,6 +37,7 @@ describe("BastionClient", () => {
   it("health() makes GET to /health", async () => {
     const client = new BastionClient({ baseUrl: "http://localhost:4000" });
     mockFetch.mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve({ status: "ok", version: "0.1.0", uptime: 10 }),
     });
 
@@ -51,6 +53,7 @@ describe("BastionClient", () => {
     const client = new BastionClient({ baseUrl: "http://localhost:4000" });
     const payload = { status: "ok" as const, version: "0.1.0", uptime: 42 };
     mockFetch.mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve(payload),
     });
 
@@ -71,6 +74,7 @@ describe("BastionClient", () => {
   it("stats() makes GET to /stats", async () => {
     const client = new BastionClient({ baseUrl: "http://localhost:4000" });
     mockFetch.mockResolvedValue({
+      ok: true,
       json: () =>
         Promise.resolve({
           totalRequests: 0,
@@ -97,6 +101,7 @@ describe("BastionClient", () => {
       cache: { size: 50, totalHits: 30 },
     };
     mockFetch.mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve(payload),
     });
 

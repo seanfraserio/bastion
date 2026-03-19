@@ -35,6 +35,7 @@ export class CacheMiddleware implements PipelineMiddleware {
     const keyData = JSON.stringify({
       model: ctx.request.model,
       messages,
+      systemPrompt: ctx.request.systemPrompt,
       temperature: ctx.request.temperature,
       maxTokens: ctx.request.maxTokens,
       agentName: ctx.agentName,
@@ -91,7 +92,7 @@ export class CacheMiddleware implements PipelineMiddleware {
       }
 
       this.cache.set(key, {
-        response: ctx.response,
+        response: structuredClone(ctx.response),
         expiresAt: Date.now() + this.ttlMs,
         hits: 0,
       });

@@ -67,6 +67,20 @@ export function createProviderRouter(config: BastionConfig): ProviderRouter {
     return provider;
   }
 
+  function enrichContext(
+    ctx: PipelineContext,
+    response: NormalizedResponse,
+    provider: IProvider,
+  ): void {
+    ctx.inputTokens = response.inputTokens;
+    ctx.outputTokens = response.outputTokens;
+    ctx.estimatedCostUsd = provider.estimateCost(
+      response.inputTokens,
+      response.outputTokens,
+      ctx.model,
+    );
+  }
+
   async function forward(ctx: PipelineContext): Promise<NormalizedResponse> {
     const primaryName = ctx.provider ?? config.providers.primary;
     const primary = getProvider(primaryName as ProviderName);
@@ -79,13 +93,7 @@ export function createProviderRouter(config: BastionConfig): ProviderRouter {
         primaryConfig,
       );
 
-      ctx.inputTokens = response.inputTokens;
-      ctx.outputTokens = response.outputTokens;
-      ctx.estimatedCostUsd = primary.estimateCost(
-        response.inputTokens,
-        response.outputTokens,
-        ctx.model,
-      );
+      enrichContext(ctx, response, primary);
 
       return response;
     } catch (err) {
@@ -112,13 +120,7 @@ export function createProviderRouter(config: BastionConfig): ProviderRouter {
             fallbackConfig,
           );
 
-          ctx.inputTokens = response.inputTokens;
-          ctx.outputTokens = response.outputTokens;
-          ctx.estimatedCostUsd = fallback.estimateCost(
-            response.inputTokens,
-            response.outputTokens,
-            ctx.model,
-          );
+          enrichContext(ctx, response, fallback);
 
           return response;
         } catch (fallbackErr) {
