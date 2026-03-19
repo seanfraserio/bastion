@@ -27,3 +27,4 @@ packages/dashboard/
 site/
 .superpowers/
 docs/superpowers/
+.worktrees/
