@@ -42,10 +42,11 @@ describe("Rate Limit Integration", () => {
   });
 
   it("over limit throws PipelineBlockedError", async () => {
+    // Use a very low RPM so token refill between sequential calls is negligible
     rateLimitMiddleware = new RateLimitMiddleware({
       rate_limits: {
         enabled: true,
-        requests_per_minute: 2,
+        requests_per_minute: 1,
       },
     } as any);
 
@@ -53,16 +54,13 @@ describe("Rate Limit Integration", () => {
     const pipeline = new Pipeline(forwardFn);
     pipeline.use(rateLimitMiddleware);
 
-    // First 2 requests succeed
+    // First request succeeds (consumes the 1 token)
     const ctx1 = makeMockContext({ sourceIp: "10.0.0.1" });
     await pipeline.run(ctx1);
 
+    // Second request should be blocked (no tokens left, refill rate is 1/60s)
     const ctx2 = makeMockContext({ sourceIp: "10.0.0.1" });
-    await pipeline.run(ctx2);
-
-    // Third request should be blocked
-    const ctx3 = makeMockContext({ sourceIp: "10.0.0.1" });
-    await expect(pipeline.run(ctx3)).rejects.toThrow(PipelineBlockedError);
+    await expect(pipeline.run(ctx2)).rejects.toThrow(PipelineBlockedError);
   });
 
   it("different IPs get independent rate limit buckets", async () => {
