@@ -20,4 +20,5 @@ COPY --from=builder /app/packages/cli/package.json ./packages/cli/package.json
 COPY --from=builder /app/packages/proxy/package.json ./packages/proxy/package.json
 COPY --from=builder /app/packages/config/package.json ./packages/config/package.json
 EXPOSE 4000
+USER node
 CMD ["node", "packages/cli/dist/index.cjs", "start"]

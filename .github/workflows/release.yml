@@ -5,12 +5,18 @@ on:
     tags:
       - "v*"
 
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -49,23 +55,23 @@ jobs:
       - name: Test
         run: pnpm test
 
-      - name: Publish @bastion-ai/config
-        run: pnpm --filter @bastion-ai/config publish --no-git-checks --access public
+      - name: Publish @openbastion-ai/config
+        run: pnpm --filter @openbastion-ai/config publish --no-git-checks --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish @bastion-ai/proxy
-        run: pnpm --filter @bastion-ai/proxy publish --no-git-checks --access public
+      - name: Publish @openbastion-ai/proxy
+        run: pnpm --filter @openbastion-ai/proxy publish --no-git-checks --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish @bastion-ai/cli
-        run: pnpm --filter @bastion-ai/cli publish --no-git-checks --access public
+      - name: Publish @openbastion-ai/cli
+        run: pnpm --filter @openbastion-ai/cli publish --no-git-checks --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish @bastion-ai/sdk
-        run: pnpm --filter @bastion-ai/sdk publish --no-git-checks --access public
+      - name: Publish @openbastion-ai/sdk
+        run: pnpm --filter @openbastion-ai/sdk publish --no-git-checks --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
