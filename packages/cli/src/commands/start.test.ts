@@ -1,19 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Command } from "commander";
 
-vi.mock("@openbastion-ai/config", () => ({
-  loadConfig: vi.fn(),
-}));
-
 vi.mock("@openbastion-ai/proxy", () => ({
   createServer: vi.fn(),
 }));
 
 import { registerStartCommand } from "./start.js";
-import { loadConfig } from "@openbastion-ai/config";
 import { createServer } from "@openbastion-ai/proxy";
 
-const mockedLoadConfig = vi.mocked(loadConfig);
 const mockedCreateServer = vi.mocked(createServer);
 
 function makeConfig() {
@@ -46,20 +40,18 @@ describe("start command", () => {
     registerStartCommand(program);
   });
 
-  it("calls loadConfig with the config path", async () => {
+  it("calls createServer with the config path", async () => {
     const fakeApp = { listen: vi.fn().mockResolvedValue(undefined) };
-    mockedLoadConfig.mockResolvedValue(makeConfig() as any);
-    mockedCreateServer.mockResolvedValue({ app: fakeApp } as any);
+    mockedCreateServer.mockResolvedValue({ app: fakeApp, config: makeConfig() } as any);
 
     await program.parseAsync(["node", "bastion", "start", "-c", "/tmp/my.yaml"]);
 
-    expect(mockedLoadConfig).toHaveBeenCalledWith("/tmp/my.yaml");
+    expect(mockedCreateServer).toHaveBeenCalledWith("/tmp/my.yaml");
   });
 
   it("calls createServer", async () => {
     const fakeApp = { listen: vi.fn().mockResolvedValue(undefined) };
-    mockedLoadConfig.mockResolvedValue(makeConfig() as any);
-    mockedCreateServer.mockResolvedValue({ app: fakeApp } as any);
+    mockedCreateServer.mockResolvedValue({ app: fakeApp, config: makeConfig() } as any);
 
     await program.parseAsync(["node", "bastion", "start"]);
 
@@ -68,8 +60,7 @@ describe("start command", () => {
 
   it("logs startup message containing 'Bastion'", async () => {
     const fakeApp = { listen: vi.fn().mockResolvedValue(undefined) };
-    mockedLoadConfig.mockResolvedValue(makeConfig() as any);
-    mockedCreateServer.mockResolvedValue({ app: fakeApp } as any);
+    mockedCreateServer.mockResolvedValue({ app: fakeApp, config: makeConfig() } as any);
 
     await program.parseAsync(["node", "bastion", "start"]);
 

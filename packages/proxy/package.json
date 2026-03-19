@@ -1,6 +1,6 @@
 {
   "name": "@openbastion-ai/proxy",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Core proxy server for Bastion",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

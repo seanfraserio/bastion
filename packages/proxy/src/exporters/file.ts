@@ -15,7 +15,7 @@ export class FileExporter implements IAuditExporter {
   constructor(filePath: string, flushIntervalMs: number = 5000) {
     this.filePath = path.resolve(filePath);
     if (filePath.includes("..")) {
-      logger.warn(`Audit log path contains '..': ${this.filePath}`);
+      throw new Error(`Audit log path must not contain '..': ${this.filePath}`);
     }
     // Create directory
     const dir = path.dirname(this.filePath);

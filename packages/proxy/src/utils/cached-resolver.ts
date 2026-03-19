@@ -23,10 +23,17 @@ export class CachedResolver<T> {
     const data = await fetcher();
     if (data === null) return null;
 
-    // Evict if at capacity
+    // Evict oldest entry if at capacity
     if (this.cache.size >= this.maxEntries) {
-      const oldest = [...this.cache.entries()].sort((a, b) => a[1].expiresAt - b[1].expiresAt)[0];
-      if (oldest) this.cache.delete(oldest[0]);
+      let oldestKey: string | undefined;
+      let oldestExpiry = Infinity;
+      for (const [k, v] of this.cache) {
+        if (v.expiresAt < oldestExpiry) {
+          oldestExpiry = v.expiresAt;
+          oldestKey = k;
+        }
+      }
+      if (oldestKey !== undefined) this.cache.delete(oldestKey);
     }
 
     // Cache

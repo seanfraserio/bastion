@@ -118,9 +118,12 @@ export class RateLimitMiddleware implements PipelineMiddleware {
     this.refill(bucket);
 
     if (bucket.tokens <= 0) {
+      // Compute how many seconds until 1 token is available
+      const retryAfterSeconds = Math.ceil(60 / bucket.requestsPerMinute);
+      ctx.metadata.retryAfterSeconds = retryAfterSeconds;
       return {
         action: "block",
-        reason: `Rate limit exceeded for "${key}". Try again later.`,
+        reason: "Rate limit exceeded. Try again later.",
         statusCode: 429,
       };
     }

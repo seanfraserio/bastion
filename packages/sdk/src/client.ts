@@ -13,6 +13,9 @@ export class BastionClient {
     const res = await fetch(`${this.baseUrl}/health`, {
       signal: AbortSignal.timeout(this.timeout),
     });
+    if (!res.ok) {
+      throw new Error(`Health check failed with status ${res.status}`);
+    }
     return res.json() as Promise<HealthResponse>;
   }
 
@@ -20,6 +23,9 @@ export class BastionClient {
     const res = await fetch(`${this.baseUrl}/stats`, {
       signal: AbortSignal.timeout(this.timeout),
     });
+    if (!res.ok) {
+      throw new Error(`Stats request failed with status ${res.status}`);
+    }
     return res.json() as Promise<StatsResponse>;
   }
 
