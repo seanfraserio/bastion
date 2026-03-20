@@ -46,6 +46,9 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Verify package exports
+        run: node -e "require('@openbastion-ai/config'); require('@openbastion-ai/proxy'); require('@openbastion-ai/sdk'); console.log('All package exports resolve correctly')"
+
       - name: Lint
         run: pnpm lint
 
