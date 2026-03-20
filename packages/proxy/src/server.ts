@@ -22,6 +22,7 @@ import type { IAuditExporter } from "./exporters/types.js";
 import { FileExporter } from "./exporters/file.js";
 import { StdoutExporter } from "./exporters/stdout.js";
 import { HttpExporter } from "./exporters/http.js";
+import { registerObservability, recordMetric } from "./observability.js";
 
 let VERSION = "0.0.0";
 try {
@@ -247,6 +248,9 @@ export async function createServer(configPath?: string) {
 
   let { pipeline, cacheMiddleware, exporter } = buildPipeline(config);
 
+  // Observability: send metrics + logs to Grafana Cloud via OTLP
+  registerObservability(app, "bastion-proxy");
+
   const stats: RequestStats = {
     totalRequests: 0,
     blockedRequests: 0,
@@ -304,6 +308,16 @@ export async function createServer(configPath?: string) {
       try {
         const result = await pipeline.run(ctx);
 
+        // Business metrics
+        recordMetric("requests_proxied_total", 1, { provider: ctx.provider ?? "unknown", model: ctx.model ?? "unknown" });
+        if (result.cacheHit) recordMetric("cache_hit_total", 1, {});
+        if (ctx.inputTokens) recordMetric("tokens_input_total", ctx.inputTokens, { provider: ctx.provider ?? "unknown" });
+        if (ctx.outputTokens) recordMetric("tokens_output_total", ctx.outputTokens, { provider: ctx.provider ?? "unknown" });
+        if (ctx.estimatedCostUsd) recordMetric("estimated_cost_usd", ctx.estimatedCostUsd, { provider: ctx.provider ?? "unknown" });
+        if (ctx.metadata?.injectionScore != null) {
+          recordMetric("injection_score", ctx.metadata.injectionScore as number, {});
+        }
+
         if (result.response?.rawBody) {
           reply.send(result.response.rawBody);
         } else {
@@ -316,6 +330,7 @@ export async function createServer(configPath?: string) {
       } catch (err) {
         if (err instanceof PipelineBlockedError) {
           stats.blockedRequests += 1;
+          recordMetric("requests_blocked_total", 1, { reason: err.reason.substring(0, 50) });
           if (err.statusCode === 429 && ctx.metadata?.retryAfterSeconds) {
             reply.header("Retry-After", String(ctx.metadata.retryAfterSeconds));
           }

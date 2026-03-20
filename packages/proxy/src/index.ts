@@ -54,3 +54,6 @@ export { estimateCost, getModelCosts, MODEL_COSTS } from "./costs.js";
 
 // Utilities
 export { CachedResolver } from "./utils/cached-resolver.js";
+
+// Observability
+export { registerObservability, recordMetric } from "./observability.js";
