@@ -110,26 +110,35 @@ class MetricsBuffer {
 
   private async flushLogs(logs: LogEntry[]): Promise<void> {
     try {
+      // Use Loki native push API (more reliable than OTLP gateway for logs)
+      const lokiEndpoint = process.env.GRAFANA_LOKI_URL ?? this.config.endpoint;
+      const lokiUser = process.env.GRAFANA_LOKI_USER ?? this.config.user;
+
+      const streams = new Map<string, Array<[string, string]>>();
+      for (const log of logs) {
+        const key = `${log.level}`;
+        if (!streams.has(key)) streams.set(key, []);
+        streams.get(key)!.push([msToNs(log.timestamp), log.message]);
+      }
+
       const body = JSON.stringify({
-        resourceLogs: [{
-          resource: { attributes: [toAttr("service.name", this.serviceName)] },
-          scopeLogs: [{
-            logRecords: logs.map((log) => ({
-              timeUnixNano: msToNs(log.timestamp),
-              severityText: log.level.toUpperCase(),
-              body: { stringValue: log.message },
-              attributes: Object.entries(log.attributes).map(([k, v]) => toAttr(k, String(v))),
-            })),
-          }],
-        }],
+        streams: Array.from(streams.entries()).map(([level, values]) => ({
+          stream: { service_name: this.serviceName, level },
+          values,
+        })),
       });
-      await fetch(`${this.config.endpoint}/otlp/v1/logs`, {
+
+      const lokiAuth = `Basic ${Buffer.from(`${lokiUser}:${this.config.token}`).toString("base64")}`;
+      const resp = await fetch(`${lokiEndpoint}/loki/api/v1/push`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: this.authHeader },
+        headers: { "Content-Type": "application/json", Authorization: lokiAuth },
         body,
       });
+      if (!resp.ok) {
+        console.error(`[obs] Log flush failed: ${resp.status}`);
+      }
     } catch {
-      // Silent
+      // Silent — observability should never break the app
     }
   }
 
