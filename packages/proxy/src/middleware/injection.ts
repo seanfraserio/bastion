@@ -64,15 +64,22 @@ export function scoreInjection(text: string): number {
   const normalized = normalizeForScoring(text);
 
   let matchedWeight = 0;
-  let totalWeight = 0;
+  const totalWeight = INJECTION_PATTERNS.reduce((sum, p) => sum + p.weight, 0);
+  if (totalWeight === 0) return 0;
+
+  const earlyExitThreshold = totalWeight * 0.7;
+
   for (const { pattern, weight } of INJECTION_PATTERNS) {
-    totalWeight += weight;
     if (pattern.test(normalized)) {
       matchedWeight += weight;
+      // Early exit: score already exceeds high-confidence threshold
+      if (matchedWeight >= earlyExitThreshold) {
+        return Math.min(matchedWeight / totalWeight, 1.0);
+      }
     }
   }
 
-  return totalWeight === 0 ? 0 : Math.min(matchedWeight / totalWeight, 1.0);
+  return Math.min(matchedWeight / totalWeight, 1.0);
 }
 
 export class InjectionDetectorMiddleware implements PipelineMiddleware {

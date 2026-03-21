@@ -91,6 +91,7 @@ export class OpenAIProvider implements IProvider {
         },
         body: JSON.stringify(body),
         signal: controller.signal,
+        keepalive: true,
       });
 
       if (!res.ok) {

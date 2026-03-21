@@ -51,19 +51,12 @@ export class RateLimitMiddleware implements PipelineMiddleware {
     }
   }
 
-  private evictOldest(): void {
-    let oldestKey: string | undefined;
-    let oldestRefill = Infinity;
-
+  private evictStale(): void {
+    const staleThreshold = Date.now() - 60_000; // 60 seconds
     for (const [key, bucket] of this.buckets) {
-      if (bucket.lastRefill < oldestRefill) {
-        oldestRefill = bucket.lastRefill;
-        oldestKey = key;
+      if (bucket.lastRefill < staleThreshold) {
+        this.buckets.delete(key);
       }
-    }
-
-    if (oldestKey !== undefined) {
-      this.buckets.delete(oldestKey);
     }
   }
 
@@ -72,7 +65,7 @@ export class RateLimitMiddleware implements PipelineMiddleware {
     if (!bucket) {
       // Enforce MAX_BUCKETS limit before creating a new one
       if (this.buckets.size >= MAX_BUCKETS) {
-        this.evictOldest();
+        this.evictStale();
       }
 
       const overrides = this.agentOverrides.get(key);

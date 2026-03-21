@@ -11,6 +11,7 @@ interface CacheEntry {
   response: NormalizedResponse;
   expiresAt: number;
   hits: number;
+  lastAccessedAt: number;
 }
 
 export class CacheMiddleware implements PipelineMiddleware {
@@ -22,7 +23,7 @@ export class CacheMiddleware implements PipelineMiddleware {
   private maxEntries: number;
 
   constructor(config: BastionConfig) {
-    this.ttlMs = (config.cache?.ttl_seconds ?? 3600) * 1000;
+    this.ttlMs = (config.cache?.ttl_seconds ?? 300) * 1000;
     this.maxEntries = config.cache?.max_entries ?? 10_000;
   }
 
@@ -63,10 +64,10 @@ export class CacheMiddleware implements PipelineMiddleware {
 
       if (entry && entry.expiresAt > Date.now()) {
         entry.hits += 1;
+        entry.lastAccessedAt = Date.now();
         ctx.cacheHit = true;
         ctx.metadata.cacheKey = key;
-        // C4: Deep-clone cached response to prevent shared mutable state
-        return { action: "short-circuit", response: structuredClone(entry.response) };
+        return { action: "short-circuit", response: { ...entry.response } };
       }
 
       // Store key in metadata for the response phase
@@ -83,18 +84,27 @@ export class CacheMiddleware implements PipelineMiddleware {
         this.evictExpired();
       }
 
-      // If still at capacity after eviction, remove the oldest entry
+      // If still at capacity after eviction, remove the least recently accessed entry
       if (this.cache.size >= this.maxEntries) {
-        const firstKey = this.cache.keys().next().value;
-        if (firstKey !== undefined) {
-          this.cache.delete(firstKey);
+        let lruKey: string | undefined;
+        let lruTime = Infinity;
+        for (const [k, v] of this.cache) {
+          if (v.lastAccessedAt < lruTime) {
+            lruTime = v.lastAccessedAt;
+            lruKey = k;
+          }
+        }
+        if (lruKey !== undefined) {
+          this.cache.delete(lruKey);
         }
       }
 
+      const now = Date.now();
       this.cache.set(key, {
-        response: structuredClone(ctx.response),
-        expiresAt: Date.now() + this.ttlMs,
+        response: { ...ctx.response },
+        expiresAt: now + this.ttlMs,
         hits: 0,
+        lastAccessedAt: now,
       });
     }
 
