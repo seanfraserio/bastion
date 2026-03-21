@@ -53,6 +53,11 @@ export interface NormalizedResponse {
   rawBody: unknown;
 }
 
+export interface StreamingResponse {
+  body: ReadableStream<Uint8Array>;
+  contentType: string;
+}
+
 export interface PolicyDecision {
   policyName: string;
   matched: boolean;
@@ -89,6 +94,11 @@ export interface IProvider {
     rawBody: unknown,
     config: ProviderConfig,
   ): Promise<NormalizedResponse>;
+  forwardStream?(
+    request: NormalizedRequest,
+    rawBody: unknown,
+    config: ProviderConfig,
+  ): Promise<StreamingResponse>;
   supports(model: string): boolean;
   estimateCost(inputTokens: number, outputTokens: number, model: string): number;
 }

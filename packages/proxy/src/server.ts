@@ -17,8 +17,10 @@ import { InjectionDetectorMiddleware } from "./middleware/injection.js";
 import { PiiRedactMiddleware } from "./middleware/pii-redact.js";
 import { AuditMiddleware } from "./middleware/audit.js";
 import { createProviderRouter } from "./fallback/router.js";
+import type { ProviderRouter } from "./fallback/router.js";
 import { routeToProvider } from "./router.js";
 import type { IAuditExporter } from "./exporters/types.js";
+import { createUsageTrackingStream } from "./streaming.js";
 import { FileExporter } from "./exporters/file.js";
 import { StdoutExporter } from "./exporters/stdout.js";
 import { HttpExporter } from "./exporters/http.js";
@@ -193,7 +195,7 @@ function createAuditExporter(config: BastionConfig): IAuditExporter {
   }
 }
 
-function buildPipeline(config: BastionConfig): { pipeline: Pipeline; cacheMiddleware: CacheMiddleware; exporter: IAuditExporter | undefined } {
+function buildPipeline(config: BastionConfig): { pipeline: Pipeline; cacheMiddleware: CacheMiddleware; exporter: IAuditExporter | undefined; providerRouter: ProviderRouter } {
   const providerRouter = createProviderRouter(config);
   const pipeline = new Pipeline((ctx) => providerRouter.forward(ctx));
 
@@ -223,7 +225,7 @@ function buildPipeline(config: BastionConfig): { pipeline: Pipeline; cacheMiddle
     pipeline.use(new AuditMiddleware(config, exporter));
   }
 
-  return { pipeline, cacheMiddleware, exporter };
+  return { pipeline, cacheMiddleware, exporter, providerRouter };
 }
 
 export async function createServer(configPath?: string) {
@@ -246,7 +248,7 @@ export async function createServer(configPath?: string) {
     bodyLimit: 10 * 1024 * 1024, // 10MB — generous for multi-turn LLM conversations
   });
 
-  let { pipeline, cacheMiddleware, exporter } = buildPipeline(config);
+  let { pipeline, cacheMiddleware, exporter, providerRouter } = buildPipeline(config);
 
   // Observability: send metrics + logs to Grafana Cloud via OTLP
   registerObservability(app, "bastion-proxy");
@@ -306,6 +308,83 @@ export async function createServer(configPath?: string) {
       ctx.sourceIp = request.ip;
 
       try {
+        // Streaming path: pipe SSE chunks directly to the client
+        if (normalizedRequest.stream) {
+          const reqResult = await pipeline.runRequestPhase(ctx);
+
+          // Short-circuit (cache hit) — unlikely for streaming but handle it
+          if (reqResult.response) {
+            reply.send(reqResult.response.rawBody);
+            return;
+          }
+
+          const provider = providerRouter.getProvider(reqResult.provider);
+          if (!provider.forwardStream) {
+            reply.code(400).send({
+              error: "streaming_not_supported",
+              message: `Provider '${reqResult.provider}' does not support streaming`,
+            });
+            return;
+          }
+
+          const providerConfig = providerRouter.getProviderConfig(reqResult.provider);
+          const streamRes = await provider.forwardStream(
+            reqResult.request,
+            reqResult.request.rawBody,
+            providerConfig,
+          );
+
+          const { stream, usage } = createUsageTrackingStream(streamRes.body, reqResult.provider);
+
+          // Set SSE headers
+          reply.raw.writeHead(200, {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Content-Type-Options": "nosniff",
+            "X-Frame-Options": "DENY",
+            "X-Request-Id": reqResult.requestId,
+          });
+
+          // Pipe stream to client
+          const reader = stream.getReader();
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              reply.raw.write(value);
+            }
+          } finally {
+            reader.releaseLock();
+            reply.raw.end();
+          }
+
+          // After stream completes, extract usage and run response-phase middleware
+          const streamUsage = await usage;
+          reqResult.inputTokens = streamUsage.inputTokens;
+          reqResult.outputTokens = streamUsage.outputTokens;
+          reqResult.response = {
+            content: "[streaming]",
+            stopReason: "end_turn",
+            inputTokens: streamUsage.inputTokens,
+            outputTokens: streamUsage.outputTokens,
+            rawBody: { streaming: true },
+          };
+
+          // Business metrics
+          recordMetric("requests_proxied_total", 1, { provider: reqResult.provider ?? "unknown", model: reqResult.model ?? "unknown" });
+          if (streamUsage.inputTokens) recordMetric("tokens_input_total", streamUsage.inputTokens, { provider: reqResult.provider ?? "unknown" });
+          if (streamUsage.outputTokens) recordMetric("tokens_output_total", streamUsage.outputTokens, { provider: reqResult.provider ?? "unknown" });
+
+          // Run response-phase middleware (audit) fire-and-forget
+          pipeline.runResponsePhase(reqResult).catch((err) => {
+            request.log.error(err);
+          });
+
+          return;
+        }
+
+        // Non-streaming path: buffer full response
         const result = await pipeline.run(ctx);
 
         // Business metrics
@@ -405,6 +484,7 @@ export async function createServer(configPath?: string) {
       pipeline = rebuilt.pipeline;
       cacheMiddleware = rebuilt.cacheMiddleware;
       exporter = rebuilt.exporter;
+      providerRouter = rebuilt.providerRouter;
       app.log.info("Configuration reloaded successfully");
     } catch (err) {
       app.log.error(

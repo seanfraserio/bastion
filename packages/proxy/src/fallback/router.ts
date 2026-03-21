@@ -50,6 +50,7 @@ function buildProviderConfig(
 export interface ProviderRouter {
   forward(ctx: PipelineContext): Promise<NormalizedResponse>;
   getProvider(name: ProviderName): IProvider;
+  getProviderConfig(name: string): ProviderConfig;
 }
 
 export function createProviderRouter(config: BastionConfig): ProviderRouter {
@@ -147,7 +148,11 @@ export function createProviderRouter(config: BastionConfig): ProviderRouter {
     }
   }
 
-  return { forward, getProvider };
+  function getProviderConfig(name: string): ProviderConfig {
+    return buildProviderConfig(name, config);
+  }
+
+  return { forward, getProvider, getProviderConfig };
 }
 
 function extractStatusCode(err: unknown): number | undefined {

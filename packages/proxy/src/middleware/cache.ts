@@ -57,6 +57,11 @@ export class CacheMiddleware implements PipelineMiddleware {
   }
 
   async process(ctx: PipelineContext): Promise<PipelineMiddlewareResult> {
+    // Skip caching entirely for streaming requests
+    if (ctx.request.stream) {
+      return { action: "continue", ctx };
+    }
+
     // Request phase: check cache for hit
     if (!ctx.response) {
       const key = this.computeKey(ctx);

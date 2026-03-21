@@ -32,6 +32,63 @@ export class Pipeline {
     this.forwardFn = fn;
   }
 
+  /**
+   * Run only request-phase middleware (for streaming requests).
+   * Returns the context — if ctx.response is set, a short-circuit (cache hit) occurred.
+   */
+  async runRequestPhase(ctx: PipelineContext): Promise<PipelineContext> {
+    for (const mw of this.middlewares) {
+      if (mw.phase !== "request" && mw.phase !== "both") {
+        continue;
+      }
+
+      const result = await mw.process(ctx);
+
+      switch (result.action) {
+        case "continue":
+          ctx = result.ctx;
+          break;
+
+        case "block":
+          throw new PipelineBlockedError(result.reason, result.statusCode);
+
+        case "short-circuit":
+          ctx.response = result.response;
+          return ctx;
+      }
+    }
+
+    return ctx;
+  }
+
+  /**
+   * Run only response-phase middleware (for streaming requests, after stream completes).
+   */
+  async runResponsePhase(ctx: PipelineContext): Promise<PipelineContext> {
+    for (const mw of this.middlewares) {
+      if (mw.phase !== "response" && mw.phase !== "both") {
+        continue;
+      }
+
+      const result = await mw.process(ctx);
+
+      switch (result.action) {
+        case "continue":
+          ctx = result.ctx;
+          break;
+
+        case "block":
+          throw new PipelineBlockedError(result.reason, result.statusCode);
+
+        case "short-circuit":
+          ctx.response = result.response;
+          break;
+      }
+    }
+
+    return ctx;
+  }
+
   async run(ctx: PipelineContext): Promise<PipelineContext> {
     let shortCircuited = false;
 

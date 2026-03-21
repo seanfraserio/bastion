@@ -11,6 +11,7 @@ export type {
   NormalizedMessage,
   NormalizedTool,
   NormalizedResponse,
+  StreamingResponse,
   PolicyDecision,
   AuditEntry,
   IProvider,
@@ -54,6 +55,10 @@ export { estimateCost, getModelCosts, MODEL_COSTS } from "./costs.js";
 
 // Utilities
 export { CachedResolver } from "./utils/cached-resolver.js";
+
+// Streaming
+export { createUsageTrackingStream } from "./streaming.js";
+export type { StreamingUsage, UsageTrackingResult } from "./streaming.js";
 
 // Observability
 export { registerObservability, recordMetric } from "./observability.js";
