@@ -290,7 +290,7 @@ export async function createServer(configPath?: string) {
   function createProxyHandler(defaultProvider: ProviderName) {
     return async (
       request: { body: unknown; headers: Record<string, string | string[] | undefined>; ip: string; log: { error: (msg: unknown) => void } },
-      reply: { code: (c: number) => { send: (b: unknown) => void }; send: (b: unknown) => void; header: (k: string, v: string) => void },
+      reply: { code: (c: number) => { send: (b: unknown) => void }; send: (b: unknown) => void; header: (k: string, v: string) => void; raw: import("http").ServerResponse },
     ) => {
       stats.totalRequests += 1;
 
