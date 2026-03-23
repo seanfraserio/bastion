@@ -1,3 +1,4 @@
+/* eslint-disable no-constant-condition */
 import { describe, it, expect } from "vitest";
 import { createUsageTrackingStream } from "./streaming.js";
 

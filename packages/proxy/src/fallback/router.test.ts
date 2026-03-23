@@ -61,7 +61,7 @@ describe("ProviderRouter (fallback/router)", () => {
     const router = createProviderRouter(config);
 
     let callCount = 0;
-    globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
+    globalThis.fetch = vi.fn().mockImplementation(async (_url: string) => {
       callCount++;
       if (callCount === 1) {
         // Primary fails with 429

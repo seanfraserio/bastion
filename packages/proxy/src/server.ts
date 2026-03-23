@@ -349,6 +349,7 @@ export async function createServer(configPath?: string) {
           // Pipe stream to client
           const reader = stream.getReader();
           try {
+            // eslint-disable-next-line no-constant-condition
             while (true) {
               const { done, value } = await reader.read();
               if (done) break;

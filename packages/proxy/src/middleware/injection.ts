@@ -45,6 +45,7 @@ const LEET_MAP: Record<string, string> = {
  */
 function normalizeForScoring(text: string): string {
   // Strip zero-width characters
+  // eslint-disable-next-line no-misleading-character-class
   let normalized = text.replace(/[\u200B\u200C\u200D\uFEFF]/g, "");
   // Unicode NFKC normalization
   normalized = normalized.normalize("NFKC");

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Pipeline } from "../../pipeline/index.js";
 import type { NormalizedResponse, PipelineContext } from "../../pipeline/types.js";
 import { makeMockContext } from "../helpers/mock-context.js";
@@ -18,7 +18,7 @@ describe("Fallback Integration", () => {
   it("primary fails then fallback succeeds", async () => {
     let callCount = 0;
 
-    const forwardFn = async (ctx: PipelineContext): Promise<NormalizedResponse> => {
+    const forwardFn = async (_ctx: PipelineContext): Promise<NormalizedResponse> => {
       callCount++;
       if (callCount === 1) {
         // Simulate primary failure: mark fallback and return a fallback response

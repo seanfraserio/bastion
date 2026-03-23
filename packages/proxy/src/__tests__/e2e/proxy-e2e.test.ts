@@ -181,7 +181,7 @@ describe("Proxy E2E - Policy Blocking", () => {
   });
 
   it("request without blocked word returns 200", async () => {
-    const { status, body } = await httpRequest(`${server.url}/v1/messages`, {
+    const { status } = await httpRequest(`${server.url}/v1/messages`, {
       method: "POST",
       body: {
         model: "claude-sonnet-4-6",
