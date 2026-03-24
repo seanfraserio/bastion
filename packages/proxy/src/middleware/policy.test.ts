@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PolicyMiddleware } from "./policy.js";
+import { PolicyMiddleware, validateRegexSafety } from "./policy.js";
 import type { BastionConfig, Policy } from "@openbastion-ai/config";
 import { makeMockContext } from "../__tests__/helpers/mock-context.js";
 
@@ -206,5 +206,88 @@ describe("PolicyMiddleware", () => {
     if (result.action === "block") {
       expect(result.statusCode).toBe(403);
     }
+  });
+
+  describe("validateRegexSafety()", () => {
+    it("returns true for safe patterns", () => {
+      expect(validateRegexSafety("[a-z]+")).toBe(true);
+      expect(validateRegexSafety("foo|bar")).toBe(true);
+      expect(validateRegexSafety("\\d{3}-\\d{4}")).toBe(true);
+    });
+
+    it("returns false for unsafe patterns with nested quantifiers", () => {
+      expect(validateRegexSafety("(a+)+")).toBe(false);
+      expect(validateRegexSafety("(a*)*")).toBe(false);
+      expect(validateRegexSafety("(a+)*")).toBe(false);
+      expect(validateRegexSafety("(a{2,})+")).toBe(false);
+    });
+  });
+
+  it("invalid regex pattern does not throw and does not match", async () => {
+    const config = makeMockConfig([
+      {
+        name: "bad-regex",
+        on: "request",
+        action: "block",
+        condition: {
+          type: "regex",
+          field: "prompt",
+          value: "[invalid",
+          case_sensitive: true,
+        },
+      },
+    ]);
+
+    const mw = new PolicyMiddleware(config);
+
+    const ctx = makeMockContext({
+      request: {
+        model: "claude-sonnet-4-6",
+        messages: [
+          { role: "user", content: "anything", rawContent: "anything" },
+        ],
+        stream: false,
+        rawBody: {},
+      },
+    });
+
+    const result = await mw.process(ctx);
+    expect(result.action).toBe("continue");
+    expect(ctx.decisions).toHaveLength(1);
+    expect(ctx.decisions[0].matched).toBe(false);
+  });
+
+  it("unsafe regex pattern does not throw and does not match", async () => {
+    const config = makeMockConfig([
+      {
+        name: "unsafe-regex",
+        on: "request",
+        action: "block",
+        condition: {
+          type: "regex",
+          field: "prompt",
+          value: "(a+)+",
+          case_sensitive: true,
+        },
+      },
+    ]);
+
+    const mw = new PolicyMiddleware(config);
+
+    const ctx = makeMockContext({
+      request: {
+        model: "claude-sonnet-4-6",
+        messages: [
+          { role: "user", content: "aaaaaaaaaa", rawContent: "aaaaaaaaaa" },
+        ],
+        stream: false,
+        rawBody: {},
+      },
+    });
+
+    const result = await mw.process(ctx);
+    expect(result.action).toBe("continue");
+    expect(ctx.decisions).toHaveLength(1);
+    expect(ctx.decisions[0].matched).toBe(false);
   });
 });

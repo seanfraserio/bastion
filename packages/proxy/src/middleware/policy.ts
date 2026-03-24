@@ -16,7 +16,7 @@ const logger = pino({ name: "bastion:policy" });
 export function validateRegexSafety(pattern: string): boolean {
   // Detect nested quantifiers: a group containing a quantifier, followed by a quantifier
   // e.g. (a+)+, (a+)*, (a*)+, (a*)*,  (a{2,})+, etc.
-  const nestedQuantifier = /\([^)]*[+*]\)[+*{]/;
+  const nestedQuantifier = /\([^)]*[+*}]\)[+*{]/;
   return !nestedQuantifier.test(pattern);
 }
 

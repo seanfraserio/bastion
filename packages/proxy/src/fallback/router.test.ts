@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createProviderRouter, ProviderError } from "./router.js";
 import type { BastionConfig } from "@openbastion-ai/config";
 import { makeMockContext } from "../__tests__/helpers/mock-context.js";

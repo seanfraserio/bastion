@@ -1,7 +1,15 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { CachedResolver } from "./cached-resolver.js";
 
 describe("CachedResolver", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("resolve() returns fetched data", async () => {
     const resolver = new CachedResolver<string>();
     const result = await resolver.resolve("key1", async () => "value1");
@@ -28,8 +36,8 @@ describe("CachedResolver", () => {
     const first = await resolver.resolve("key1", fetcher);
     expect(first).toBe("value1");
 
-    // Wait for TTL to expire
-    await new Promise((r) => setTimeout(r, 60));
+    // Advance time past TTL
+    vi.advanceTimersByTime(60);
 
     const second = await resolver.resolve("key1", fetcher);
     expect(second).toBe("value2");
@@ -78,8 +86,8 @@ describe("CachedResolver", () => {
     const resolver = new CachedResolver<string>({ maxEntries: 2 });
 
     await resolver.resolve("key1", async () => "value1");
-    // Small delay so key2 has a later expiry than key1
-    await new Promise((r) => setTimeout(r, 5));
+    // Advance time so key2 has a later expiry than key1
+    vi.advanceTimersByTime(1);
     await resolver.resolve("key2", async () => "value2");
     // key1 has the earliest expiry, so it should be evicted
     await resolver.resolve("key3", async () => "value3");

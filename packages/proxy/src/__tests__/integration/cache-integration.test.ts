@@ -121,20 +121,15 @@ describe("Cache Integration", () => {
     pipeline.use(cacheMiddleware);
 
     // First request
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now);
+
     const ctx1 = makeMockContext();
     await pipeline.run(ctx1);
     expect(forwardFn).toHaveBeenCalledTimes(1);
 
-    // Advance time past TTL (1 second = 1000ms)
-    vi.useFakeTimers();
-    vi.advanceTimersByTime(1500);
-
-    // Manually expire using real Date.now for the cache check
-    // The CacheMiddleware uses Date.now() internally, so we need to mock it
-    vi.useRealTimers();
-
-    // Wait for the TTL to expire
-    await new Promise((resolve) => setTimeout(resolve, 1100));
+    // Advance past TTL (1 second = 1000ms)
+    vi.spyOn(Date, "now").mockReturnValue(now + 1500);
 
     // Second request: cache should be expired
     const ctx2 = makeMockContext();
