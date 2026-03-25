@@ -64,6 +64,14 @@ interface RequestStats {
   errors: number;
 }
 
+function normalizeMessage(raw: { role: string; content: unknown }): NormalizedMessage {
+  return {
+    role: raw.role as NormalizedMessage["role"],
+    content: typeof raw.content === "string" ? raw.content : JSON.stringify(raw.content),
+    rawContent: raw.content,
+  };
+}
+
 function buildNormalizedRequest(
   body: Record<string, unknown>,
   provider: ProviderName,
@@ -76,25 +84,13 @@ function buildNormalizedRequest(
     throw Object.assign(new Error("body.messages must be an array"), { statusCode: 400 });
   }
 
-  const messages: NormalizedMessage[] = [];
+  const rawMessages = body.messages as Array<{ role: string; content: unknown }>;
 
   if (provider === "anthropic") {
-    // Anthropic format: { model, messages: [{role, content}], system?, ... }
-    const rawMessages = body.messages as Array<{
-      role: string;
-      content: unknown;
-    }>;
-    for (const m of rawMessages) {
-      messages.push({
-        role: m.role as NormalizedMessage["role"],
-        content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-        rawContent: m.content,
-      });
-    }
-
+    // Anthropic format: system prompt is a separate top-level field
     return {
       model: body.model as string,
-      messages,
+      messages: rawMessages.map(normalizeMessage),
       systemPrompt: typeof body.system === "string" ? body.system : undefined,
       temperature: body.temperature as number | undefined,
       maxTokens: (body.max_tokens as number | undefined) ?? 4096,
@@ -103,23 +99,15 @@ function buildNormalizedRequest(
     };
   }
 
-  // OpenAI format: { model, messages: [{role, content}], ... }
-  const rawMessages = body.messages as Array<{
-    role: string;
-    content: unknown;
-  }>;
-
+  // OpenAI format: system prompt is a message with role "system"
+  const messages: NormalizedMessage[] = [];
   let systemPrompt: string | undefined;
   for (const m of rawMessages) {
     if (m.role === "system") {
       systemPrompt = typeof m.content === "string" ? m.content : JSON.stringify(m.content);
       continue;
     }
-    messages.push({
-      role: m.role as NormalizedMessage["role"],
-      content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-      rawContent: m.content,
-    });
+    messages.push(normalizeMessage(m));
   }
 
   return {

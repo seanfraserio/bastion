@@ -1,12 +1,6 @@
 import { Command } from "commander";
 import { loadConfig } from "@openbastion-ai/config";
 
-function maskKey(key: string | undefined): string {
-  if (!key) return "(not set)";
-  if (key.length <= 4) return "****";
-  return "****" + key.slice(-4);
-}
-
 export function registerValidateCommand(program: Command): void {
   program
     .command("validate")
@@ -30,7 +24,7 @@ export function registerValidateCommand(program: Command): void {
         console.log(`  fallback: ${config.providers.fallback ?? "(none)"}`);
         for (const [name, def] of Object.entries(config.providers.definitions)) {
           console.log(`  [providers.definitions.${name}]`);
-          console.log(`    api_key:    ${maskKey(def.api_key)}`);
+          console.log(`    api_key:    ${!def.api_key ? "(not set)" : def.api_key.length <= 4 ? "****" : "****" + def.api_key.slice(-4)}`);
           if (def.base_url) console.log(`    base_url:   ${def.base_url}`);
           if (def.timeout_ms) console.log(`    timeout_ms: ${def.timeout_ms}`);
         }

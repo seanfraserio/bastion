@@ -1,6 +1,7 @@
 import type {
   PipelineContext,
   PipelineMiddleware,
+  PipelineMiddlewareResult,
   NormalizedResponse,
 } from "./types.js";
 
@@ -15,6 +16,27 @@ export class PipelineBlockedError extends Error {
 }
 
 export type ForwardFn = (ctx: PipelineContext) => Promise<NormalizedResponse>;
+
+/**
+ * Applies a middleware result to the pipeline context.
+ * Returns { ctx, shortCircuited } — the caller decides how to handle short-circuits.
+ */
+function applyResult(
+  result: PipelineMiddlewareResult,
+  ctx: PipelineContext,
+): { ctx: PipelineContext; shortCircuited: boolean } {
+  switch (result.action) {
+    case "continue":
+      return { ctx: result.ctx, shortCircuited: false };
+
+    case "block":
+      throw new PipelineBlockedError(result.reason, result.statusCode);
+
+    case "short-circuit":
+      ctx.response = result.response;
+      return { ctx, shortCircuited: true };
+  }
+}
 
 export class Pipeline {
   private middlewares: PipelineMiddleware[] = [];
@@ -42,20 +64,9 @@ export class Pipeline {
         continue;
       }
 
-      const result = await mw.process(ctx);
-
-      switch (result.action) {
-        case "continue":
-          ctx = result.ctx;
-          break;
-
-        case "block":
-          throw new PipelineBlockedError(result.reason, result.statusCode);
-
-        case "short-circuit":
-          ctx.response = result.response;
-          return ctx;
-      }
+      const applied = applyResult(await mw.process(ctx), ctx);
+      ctx = applied.ctx;
+      if (applied.shortCircuited) return ctx;
     }
 
     return ctx;
@@ -70,51 +81,27 @@ export class Pipeline {
         continue;
       }
 
-      const result = await mw.process(ctx);
-
-      switch (result.action) {
-        case "continue":
-          ctx = result.ctx;
-          break;
-
-        case "block":
-          throw new PipelineBlockedError(result.reason, result.statusCode);
-
-        case "short-circuit":
-          ctx.response = result.response;
-          break;
-      }
+      const applied = applyResult(await mw.process(ctx), ctx);
+      ctx = applied.ctx;
     }
 
     return ctx;
   }
 
   async run(ctx: PipelineContext): Promise<PipelineContext> {
-    let shortCircuited = false;
-
     // 1. Run request-phase middlewares (phase === "request" or "both")
+    let shortCircuited = false;
     for (const mw of this.middlewares) {
       if (mw.phase !== "request" && mw.phase !== "both") {
         continue;
       }
 
-      const result = await mw.process(ctx);
-
-      switch (result.action) {
-        case "continue":
-          ctx = result.ctx;
-          break;
-
-        case "block":
-          throw new PipelineBlockedError(result.reason, result.statusCode);
-
-        case "short-circuit":
-          ctx.response = result.response;
-          shortCircuited = true;
-          break;
+      const applied = applyResult(await mw.process(ctx), ctx);
+      ctx = applied.ctx;
+      if (applied.shortCircuited) {
+        shortCircuited = true;
+        break;
       }
-
-      if (shortCircuited) break;
     }
 
     // 2. Call provider if not short-circuited
@@ -132,21 +119,8 @@ export class Pipeline {
         continue;
       }
 
-      const result = await mw.process(ctx);
-
-      switch (result.action) {
-        case "continue":
-          ctx = result.ctx;
-          break;
-
-        case "block":
-          throw new PipelineBlockedError(result.reason, result.statusCode);
-
-        case "short-circuit":
-          // In response phase, short-circuit replaces the response
-          ctx.response = result.response;
-          break;
-      }
+      const applied = applyResult(await mw.process(ctx), ctx);
+      ctx = applied.ctx;
     }
 
     return ctx;

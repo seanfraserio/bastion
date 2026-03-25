@@ -1,5 +1,5 @@
 import pino from "pino";
-import type { IAuditExporter } from "./types.js";
+import { BufferedExporter } from "./buffered.js";
 import type { AuditEntry } from "../pipeline/types.js";
 
 const logger = pino({ name: "bastion:exporter:http" });
@@ -11,22 +11,20 @@ interface RetryBatch {
   retryCount: number;
 }
 
-export class HttpExporter implements IAuditExporter {
+export class HttpExporter extends BufferedExporter {
   readonly name = "http";
   private buffer: AuditEntry[] = [];
   private retryQueue: RetryBatch[] = [];
   private endpoint: string;
   private headers: Record<string, string>;
-  private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(endpoint: string, headers?: Record<string, string>, flushIntervalMs: number = 5000) {
+    super(flushIntervalMs);
     if (!endpoint.startsWith("http://") && !endpoint.startsWith("https://")) {
       throw new Error(`HttpExporter endpoint must start with http:// or https://, got: ${endpoint}`);
     }
     this.endpoint = endpoint;
     this.headers = { "Content-Type": "application/json", ...headers };
-    this.timer = setInterval(() => this.flush(), flushIntervalMs);
-    if (this.timer.unref) this.timer.unref();
   }
 
   export(entry: AuditEntry): void {
@@ -61,10 +59,5 @@ export class HttpExporter implements IAuditExporter {
         logger.error(`HTTP audit export dropped batch after ${MAX_RETRIES} retries (${entries.length} entries)`);
       }
     }
-  }
-
-  async shutdown(): Promise<void> {
-    if (this.timer) clearInterval(this.timer);
-    await this.flush();
   }
 }
