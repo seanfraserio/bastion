@@ -110,7 +110,7 @@ export class RateLimitMiddleware implements PipelineMiddleware {
 
     this.refill(bucket);
 
-    if (bucket.tokens <= 0) {
+    if (bucket.tokens < 1) {
       // Compute how many seconds until 1 token is available
       const retryAfterSeconds = Math.ceil(60 / bucket.requestsPerMinute);
       ctx.metadata.retryAfterSeconds = retryAfterSeconds;
