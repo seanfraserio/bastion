@@ -17,7 +17,23 @@ export function validateRegexSafety(pattern: string): boolean {
   // Detect nested quantifiers: a group containing a quantifier, followed by a quantifier
   // e.g. (a+)+, (a+)*, (a*)+, (a*)*,  (a{2,})+, etc.
   const nestedQuantifier = /\([^)]*[+*}]\)[+*{]/;
-  return !nestedQuantifier.test(pattern);
+  if (nestedQuantifier.test(pattern)) return false;
+
+  // Detect alternation overlap: groups with alternation where branches share a common prefix
+  // e.g. (a|a)*, (ab|ab)+, (foo|foo)* — can cause exponential backtracking
+  const alternationGroup = /\(([^)]+)\)[+*{]/;
+  const altMatch = alternationGroup.exec(pattern);
+  if (altMatch) {
+    const branches = altMatch[1].split("|").map((b) => b.trim());
+    const uniqueBranches = new Set(branches);
+    if (uniqueBranches.size < branches.length) return false; // duplicate branches
+  }
+
+  // Detect overlapping character classes with quantifiers: e.g. ([\s\S]*)*, (.*)*
+  const overlappingClasses = /\([^)]*\.\*[^)]*\)[+*{]/;
+  if (overlappingClasses.test(pattern)) return false;
+
+  return true;
 }
 
 /**

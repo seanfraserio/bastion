@@ -128,10 +128,15 @@ function buildPipelineContext(
 ): PipelineContext {
   // Validate x-request-id: must match safe pattern or generate fresh
   const rawRequestId = headers["x-request-id"] as string | undefined;
-  const requestId =
-    rawRequestId && VALID_REQUEST_ID.test(rawRequestId)
-      ? rawRequestId
-      : uuidv4();
+  let requestId: string;
+  if (rawRequestId && VALID_REQUEST_ID.test(rawRequestId)) {
+    requestId = rawRequestId;
+  } else {
+    requestId = uuidv4();
+    if (rawRequestId) {
+      console.warn(`[bastion] Rejected invalid x-request-id: ${JSON.stringify(rawRequestId).slice(0, 200)}`);
+    }
+  }
 
   // Validate x-bastion-env: must match safe pattern or default to "production"
   const rawEnv = headers["x-bastion-env"] as string | undefined;
@@ -445,12 +450,22 @@ export async function createServer(configPath?: string) {
     };
   });
 
-  app.get("/stats", async () => ({
-    totalRequests: stats.totalRequests,
-    blockedRequests: stats.blockedRequests,
-    errors: stats.errors,
-    cache: cacheMiddleware.stats,
-  }));
+  app.get("/stats", async (request, reply) => {
+    // Stats endpoint requires auth — exposes operational metrics
+    if (config.auth.enabled) {
+      const token = extractBearerToken(request.headers);
+      if (!token || !constantTimeTokenMatch(config.auth.tokens, token)) {
+        return reply.code(401).send({ error: "unauthorized" });
+      }
+    }
+
+    return {
+      totalRequests: stats.totalRequests,
+      blockedRequests: stats.blockedRequests,
+      errors: stats.errors,
+      cache: cacheMiddleware.stats,
+    };
+  });
 
   // Graceful shutdown: flush exporters and close on signals
   app.addHook("onClose", async () => {
