@@ -140,3 +140,68 @@ describe("bastionConfigSchema", () => {
     expect(result.success).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Upstream config (edge proxy mode)
+// ---------------------------------------------------------------------------
+describe("upstream config", () => {
+  const baseConfig = { version: "1", proxy: { port: 4000 }, auth: { enabled: false, tokens: [] } };
+
+  it("accepts valid upstream config without providers", () => {
+    const result = bastionConfigSchema.safeParse({
+      ...baseConfig,
+      upstream: { url: "https://cloud.bastion.example.com", proxy_key: "bst_test_key" },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.upstream?.timeout_ms).toBe(30000);
+      expect(result.data.upstream?.forward_agent_headers).toBe(true);
+    }
+  });
+
+  it("rejects config with both upstream and providers", () => {
+    const result = bastionConfigSchema.safeParse({
+      ...baseConfig,
+      upstream: { url: "https://cloud.bastion.example.com", proxy_key: "key" },
+      providers: { primary: "anthropic", definitions: { anthropic: {} } },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects config with neither upstream nor providers", () => {
+    const result = bastionConfigSchema.safeParse(baseConfig);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects upstream with invalid url", () => {
+    const result = bastionConfigSchema.safeParse({
+      ...baseConfig,
+      upstream: { url: "not-a-url", proxy_key: "key" },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects upstream with empty proxy_key", () => {
+    const result = bastionConfigSchema.safeParse({
+      ...baseConfig,
+      upstream: { url: "https://cloud.example.com", proxy_key: "" },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("existing provider configs still validate", () => {
+    const result = bastionConfigSchema.safeParse({
+      ...baseConfig,
+      providers: { primary: "anthropic", definitions: { anthropic: {} } },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("existing provider refinements still work", () => {
+    const result = bastionConfigSchema.safeParse({
+      ...baseConfig,
+      providers: { primary: "missing", definitions: { anthropic: {} } },
+    });
+    expect(result.success).toBe(false);
+  });
+});

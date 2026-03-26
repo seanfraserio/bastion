@@ -154,6 +154,19 @@ export const lanternSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// Upstream (edge proxy mode)
+// ---------------------------------------------------------------------------
+
+export const upstreamSchema = z.object({
+  url: z.string().url(),
+  proxy_key: z.string().min(1),
+  timeout_ms: z.number().int().positive().optional().default(30000),
+  forward_agent_headers: z.boolean().optional().default(true),
+});
+
+export type UpstreamConfig = z.infer<typeof upstreamSchema>;
+
+// ---------------------------------------------------------------------------
 // Auth
 // ---------------------------------------------------------------------------
 
@@ -169,7 +182,8 @@ export const authSchema = z.object({
 export const bastionConfigSchema = z.object({
   version: z.string(),
   proxy: proxySchema,
-  providers: providersSchema,
+  providers: providersSchema.optional(),
+  upstream: upstreamSchema.optional(),
   auth: authSchema,
   cache: cacheSchema.optional(),
   rate_limits: rateLimitsSchema.optional(),
@@ -177,10 +191,16 @@ export const bastionConfigSchema = z.object({
   audit: auditSchema.optional(),
   lantern: lanternSchema.optional(),
 }).refine(
-  (data) => data.providers.primary in data.providers.definitions,
+  (data) => !(data.upstream && data.providers),
+  { message: "upstream and providers are mutually exclusive — use one or the other" },
+).refine(
+  (data) => !!(data.upstream || data.providers),
+  { message: "either upstream or providers must be configured" },
+).refine(
+  (data) => !data.providers || data.providers.primary in data.providers.definitions,
   { message: "providers.primary must reference a provider defined in providers.definitions" },
 ).refine(
-  (data) => !data.providers.fallback || data.providers.fallback in data.providers.definitions,
+  (data) => !data.providers || !data.providers.fallback || data.providers.fallback in data.providers.definitions,
   { message: "providers.fallback must reference a provider defined in providers.definitions" },
 );
 
