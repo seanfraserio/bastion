@@ -23,15 +23,23 @@ export function registerStartCommand(program: Command): void {
           ? "enabled"
           : "disabled";
         const auditOutput = config.audit?.output ?? "file";
-        const fallback = config.providers.fallback ?? "none";
 
         await app.listen({ port, host });
 
-        console.log(
-          `Bastion v0.1.0 running on http://${host}:${port}\n` +
-          `Primary provider: ${config.providers.primary} | Fallback: ${fallback}\n` +
-          `Cache: ${cacheStatus} | Rate limiting: ${rateLimitStatus} | Audit: ${auditOutput}`
-        );
+        if (config.upstream) {
+          console.log(
+            `Bastion v0.2.4 running on http://${host}:${port}\n` +
+            `Mode: edge → ${config.upstream.url}\n` +
+            `Cache: ${cacheStatus} | Rate limiting: ${rateLimitStatus} | Audit: ${auditOutput}`
+          );
+        } else {
+          const fallback = config.providers?.fallback ?? "none";
+          console.log(
+            `Bastion v0.2.4 running on http://${host}:${port}\n` +
+            `Primary provider: ${config.providers?.primary} | Fallback: ${fallback}\n` +
+            `Cache: ${cacheStatus} | Rate limiting: ${rateLimitStatus} | Audit: ${auditOutput}`
+          );
+        }
       } catch (err) {
         console.error(
           "Failed to start Bastion:",
