@@ -25,6 +25,9 @@ import { FileExporter } from "./exporters/file.js";
 import { StdoutExporter } from "./exporters/stdout.js";
 import { HttpExporter } from "./exporters/http.js";
 import { registerObservability, recordMetric } from "./observability.js";
+import { UpstreamProvider } from "./upstream/provider.js";
+import type { ForwardFn } from "./pipeline/index.js";
+import type { StreamingResponse } from "./pipeline/types.js";
 
 let VERSION = "0.0.0";
 try {
@@ -188,9 +191,26 @@ function createAuditExporter(config: BastionConfig): IAuditExporter {
   }
 }
 
-function buildPipeline(config: BastionConfig): { pipeline: Pipeline; cacheMiddleware: CacheMiddleware; exporter: IAuditExporter | undefined; providerRouter: ProviderRouter } {
-  const providerRouter = createProviderRouter(config);
-  const pipeline = new Pipeline((ctx) => providerRouter.forward(ctx));
+function buildPipeline(config: BastionConfig): {
+  pipeline: Pipeline;
+  cacheMiddleware: CacheMiddleware;
+  exporter: IAuditExporter | undefined;
+  providerRouter: ProviderRouter | undefined;
+  upstreamProvider: UpstreamProvider | undefined;
+} {
+  let providerRouter: ProviderRouter | undefined;
+  let upstreamProvider: UpstreamProvider | undefined;
+  let forwardFn: ForwardFn;
+
+  if (config.upstream) {
+    upstreamProvider = new UpstreamProvider(config.upstream);
+    forwardFn = (ctx) => upstreamProvider!.forward(ctx);
+  } else {
+    providerRouter = createProviderRouter(config);
+    forwardFn = (ctx) => providerRouter!.forward(ctx);
+  }
+
+  const pipeline = new Pipeline(forwardFn);
 
   // Order: rate-limit -> injection -> policy(request) -> cache(request)
   //        -> [provider]
@@ -218,7 +238,7 @@ function buildPipeline(config: BastionConfig): { pipeline: Pipeline; cacheMiddle
     pipeline.use(new AuditMiddleware(config, exporter));
   }
 
-  return { pipeline, cacheMiddleware, exporter, providerRouter };
+  return { pipeline, cacheMiddleware, exporter, providerRouter, upstreamProvider };
 }
 
 export async function createServer(configPath?: string) {
@@ -241,7 +261,7 @@ export async function createServer(configPath?: string) {
     bodyLimit: 10 * 1024 * 1024, // 10MB — generous for multi-turn LLM conversations
   });
 
-  let { pipeline, cacheMiddleware, exporter, providerRouter } = buildPipeline(config);
+  let { pipeline, cacheMiddleware, exporter, providerRouter, upstreamProvider } = buildPipeline(config);
 
   // Observability: send metrics + logs to Grafana Cloud via OTLP
   registerObservability(app, "bastion-proxy");
@@ -288,10 +308,12 @@ export async function createServer(configPath?: string) {
       stats.totalRequests += 1;
 
       const body = request.body as Record<string, unknown>;
-      const provider = routeToProvider(
-        defaultProvider === "anthropic" ? "/v1/messages" : "/v1/chat/completions",
-        config,
-      );
+      const provider = config.upstream
+        ? defaultProvider  // edge mode: use provider from route registration
+        : routeToProvider(
+            defaultProvider === "anthropic" ? "/v1/messages" : "/v1/chat/completions",
+            config,
+          );
       const normalizedRequest = buildNormalizedRequest(body, provider);
       const ctx = buildPipelineContext(
         normalizedRequest,
@@ -311,21 +333,31 @@ export async function createServer(configPath?: string) {
             return;
           }
 
-          const provider = providerRouter.getProvider(reqResult.provider);
-          if (!provider.forwardStream) {
-            reply.code(400).send({
-              error: "streaming_not_supported",
-              message: `Provider '${reqResult.provider}' does not support streaming`,
-            });
-            return;
+          let streamRes: StreamingResponse;
+          if (config.upstream && upstreamProvider) {
+            streamRes = await upstreamProvider.forwardStream(
+              reqResult.request,
+              reqResult.request.rawBody,
+              reqResult,
+            );
+          } else if (providerRouter) {
+            const streamProvider = providerRouter.getProvider(reqResult.provider);
+            if (!streamProvider.forwardStream) {
+              reply.code(400).send({
+                error: "streaming_not_supported",
+                message: `Provider '${reqResult.provider}' does not support streaming`,
+              });
+              return;
+            }
+            const providerConfig = providerRouter.getProviderConfig(reqResult.provider);
+            streamRes = await streamProvider.forwardStream(
+              reqResult.request,
+              reqResult.request.rawBody,
+              providerConfig,
+            );
+          } else {
+            throw new Error("No provider or upstream configured");
           }
-
-          const providerConfig = providerRouter.getProviderConfig(reqResult.provider);
-          const streamRes = await provider.forwardStream(
-            reqResult.request,
-            reqResult.request.rawBody,
-            providerConfig,
-          );
 
           const { stream, usage } = createUsageTrackingStream(streamRes.body, reqResult.provider);
 
@@ -443,6 +475,15 @@ export async function createServer(configPath?: string) {
       }
     }
 
+    if (config.upstream) {
+      return {
+        status: "ok",
+        version: VERSION,
+        mode: "edge",
+        upstream_url: config.upstream.url,
+      };
+    }
+
     return {
       status: "ok",
       version: VERSION,
@@ -489,6 +530,7 @@ export async function createServer(configPath?: string) {
       cacheMiddleware = rebuilt.cacheMiddleware;
       exporter = rebuilt.exporter;
       providerRouter = rebuilt.providerRouter;
+      upstreamProvider = rebuilt.upstreamProvider;
       app.log.info("Configuration reloaded successfully");
     } catch (err) {
       app.log.error(
