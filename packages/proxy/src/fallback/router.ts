@@ -62,7 +62,7 @@ function buildProviderConfig(
   providerName: string,
   config: BastionConfig,
 ): ProviderConfig {
-  const def = config.providers.definitions[providerName];
+  const def = config.providers!.definitions[providerName];
   const defaultUrls: Record<string, string> = {
     anthropic: "https://api.anthropic.com",
     openai: "https://api.openai.com",
@@ -122,7 +122,7 @@ export function createProviderRouter(config: BastionConfig): ProviderRouter {
   }
 
   async function forward(ctx: PipelineContext): Promise<NormalizedResponse> {
-    const primaryName = ctx.provider ?? config.providers.primary;
+    const primaryName = ctx.provider ?? config.providers!.primary;
     const primary = getProvider(primaryName as ProviderName);
     const primaryConfig = buildProviderConfig(primaryName, config);
 
@@ -142,8 +142,8 @@ export function createProviderRouter(config: BastionConfig): ProviderRouter {
         statusCode !== undefined &&
         (statusCode === 429 || statusCode >= 500);
 
-      if (shouldFallback && config.providers.fallback) {
-        const fallbackName = config.providers.fallback;
+      if (shouldFallback && config.providers?.fallback) {
+        const fallbackName = config.providers.fallback!;
         const fallback = getProvider(fallbackName as ProviderName);
         const fallbackConfig = buildProviderConfig(fallbackName, config);
 
