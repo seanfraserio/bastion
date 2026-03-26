@@ -28,11 +28,41 @@ const PROVIDER_MAP: Record<string, () => IProvider> = {
   bedrock: () => new BedrockProvider(),
 };
 
+// ── Block private/reserved IPs in provider base_url (defense-in-depth) ──
+const PRIVATE_IP_PATTERNS = [
+  /^127\./,                          // loopback
+  /^10\./,                           // 10.0.0.0/8
+  /^172\.(1[6-9]|2\d|3[01])\./,     // 172.16.0.0/12
+  /^192\.168\./,                     // 192.168.0.0/16
+  /^169\.254\./,                     // link-local
+  /^0\./,                            // 0.0.0.0/8
+  /^\[?::1\]?$/,                     // IPv6 loopback
+  /^\[?fc/i,                         // IPv6 unique local
+  /^\[?fd/i,                         // IPv6 unique local
+  /^\[?fe80/i,                       // IPv6 link-local
+];
+
+function isPrivateUrl(urlStr: string): boolean {
+  try {
+    const parsed = new URL(urlStr);
+    const hostname = parsed.hostname;
+    if (hostname === "localhost") return true;
+    return PRIVATE_IP_PATTERNS.some((re) => re.test(hostname));
+  } catch {
+    return true; // invalid URL → block
+  }
+}
+
+// Known safe default URLs that are allowed even though some match private patterns
+const SAFE_DEFAULT_URLS = new Set([
+  "http://localhost:11434", // Ollama local runner
+]);
+
 function buildProviderConfig(
   providerName: string,
   config: BastionConfig,
 ): ProviderConfig {
-  const def = config.providers.definitions[providerName];
+  const def = config.providers!.definitions[providerName];
   const defaultUrls: Record<string, string> = {
     anthropic: "https://api.anthropic.com",
     openai: "https://api.openai.com",
@@ -40,9 +70,18 @@ function buildProviderConfig(
     bedrock: "https://bedrock-runtime.us-east-1.amazonaws.com",
   };
 
+  const baseUrl = def?.base_url ?? defaultUrls[providerName] ?? "https://localhost";
+
+  // Warn on private IPs in user-configured base_url (allow known defaults like Ollama).
+  // This is admin-controlled config (YAML file), so we warn rather than block — the admin
+  // may intentionally use a local URL (e.g., Ollama, local model server, test mock).
+  if (def?.base_url && isPrivateUrl(def.base_url) && !SAFE_DEFAULT_URLS.has(def.base_url)) {
+    console.warn(`[bastion] WARNING: Provider "${providerName}" uses private base_url "${def.base_url}". This is unsafe in production — use a public endpoint or allowlisted URL.`);
+  }
+
   return {
     apiKey: def?.api_key,
-    baseUrl: def?.base_url ?? defaultUrls[providerName] ?? "http://localhost",
+    baseUrl,
     timeoutMs: def?.timeout_ms ?? 30_000,
   };
 }
@@ -83,7 +122,7 @@ export function createProviderRouter(config: BastionConfig): ProviderRouter {
   }
 
   async function forward(ctx: PipelineContext): Promise<NormalizedResponse> {
-    const primaryName = ctx.provider ?? config.providers.primary;
+    const primaryName = ctx.provider ?? config.providers!.primary;
     const primary = getProvider(primaryName as ProviderName);
     const primaryConfig = buildProviderConfig(primaryName, config);
 
@@ -103,8 +142,8 @@ export function createProviderRouter(config: BastionConfig): ProviderRouter {
         statusCode !== undefined &&
         (statusCode === 429 || statusCode >= 500);
 
-      if (shouldFallback && config.providers.fallback) {
-        const fallbackName = config.providers.fallback;
+      if (shouldFallback && config.providers?.fallback) {
+        const fallbackName = config.providers.fallback!;
         const fallback = getProvider(fallbackName as ProviderName);
         const fallbackConfig = buildProviderConfig(fallbackName, config);
 

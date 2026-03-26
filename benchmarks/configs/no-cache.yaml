@@ -1,0 +1,45 @@
+# Full pipeline minus cache — isolates cache overhead.
+# Compare full-pipeline.yaml vs no-cache.yaml to measure cache cost.
+
+version: "1"
+
+proxy:
+  port: 4000
+  host: "127.0.0.1"
+  log_level: warn
+
+providers:
+  primary: anthropic
+  definitions:
+    anthropic:
+      api_key: "bench-key-not-real"
+      base_url: "http://127.0.0.1:9999"
+      timeout_ms: 10000
+
+auth:
+  enabled: true
+  tokens:
+    - "bench-token-1"
+
+cache:
+  enabled: false
+
+rate_limits:
+  enabled: true
+  default:
+    requests_per_minute: 10000
+    tokens_per_minute: 10000000
+
+policies:
+  - name: block-injections
+    on: request
+    condition:
+      type: injection_score
+      threshold: 0.9
+    action: block
+
+audit:
+  enabled: true
+  output: stdout
+  include_request_body: false
+  include_response_body: false

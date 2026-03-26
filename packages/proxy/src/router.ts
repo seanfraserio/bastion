@@ -23,5 +23,5 @@ export function routeToProvider(
     return "openai";
   }
 
-  return config.providers.primary as ProviderName;
+  return config.providers!.primary as ProviderName;
 }
