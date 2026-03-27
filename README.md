@@ -99,6 +99,19 @@ providers:
 
 Supported: Anthropic, OpenAI, Ollama, AWS Bedrock.
 
+### Edge Proxy Mode
+
+Run a local Bastion proxy on your infrastructure that forwards to an upstream cloud Bastion proxy. Get local caching, policy enforcement, and audit logging while the cloud handles tenant auth, billing, and provider routing.
+
+```yaml
+upstream:
+  url: "https://api.bastion.cloud"
+  proxy_key: "${BASTION_PROXY_KEY}"
+  forward_agent_headers: true
+```
+
+The `upstream` section replaces `providers` -- Bastion operates in **edge mode** and forwards requests to the cloud proxy instead of directly to AI providers. All middleware (cache, rate limiting, policies, audit) works locally. See [Edge Proxy example](./examples/edge-proxy/) for a complete setup.
+
 ### Audit
 
 Structured JSON logs for every request, including timing, provider used, policy decisions, and optionally full request/response bodies:
@@ -115,6 +128,7 @@ audit:
 | Feature | OSS (MIT) | Enterprise (BUSL-1.1) |
 |---------|-----------|----------------------|
 | Proxy & pipeline | Yes | Yes |
+| Edge proxy mode | Yes | Yes |
 | All providers | Yes | Yes |
 | Exact-match cache | Yes | Yes |
 | Semantic cache | -- | Yes |
@@ -169,6 +183,7 @@ Point Forge's `base_url` at Bastion. Enable Lantern integration in `bastion.yaml
 - [PII Redaction](./examples/pii-redaction/) -- Redact emails and phone numbers
 - [Rate Limiting](./examples/rate-limiting/) -- Per-agent rate limits
 - [Injection Detection](./examples/injection-detection/) -- Block prompt injection attacks
+- [Edge Proxy](./examples/edge-proxy/) -- Local proxy forwarding to a cloud Bastion
 
 ## Contributing
 

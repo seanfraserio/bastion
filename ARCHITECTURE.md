@@ -49,6 +49,36 @@ Bastion is an open-source security gateway for AI agent traffic. It sits between
 - `GET  /health` -- Health check (limited info for unauthenticated callers)
 - `GET  /stats` -- Request/cache statistics
 
+### Edge Proxy Mode
+
+When `upstream` is configured instead of `providers`, Bastion operates in **edge mode**. The middleware pipeline runs identically, but the terminal action forwards to an upstream Bastion proxy instead of directly to an AI provider:
+
+```
+┌─ Customer Site ──────────────────────────┐
+│                                          │
+│  AI Agents ──▶ Local Bastion (edge mode) │
+│                  │ local auth             │
+│                  │ local middleware        │
+│                  │ local cache             │
+│                  │ local audit             │
+│                  │                        │
+└──────────────────┼────────────────────────┘
+                   │ HTTPS
+                   ▼
+┌─ Cloud ──────────────────────────────────┐
+│  Cloud Bastion (data-plane)              │
+│    │ tenant auth (proxy_key)             │
+│    │ billing / usage tracking            │
+│    │ per-agent tracking (forwarded hdrs) │
+│    │ cloud middleware pipeline            │
+│    │ provider routing                    │
+│    ▼                                     │
+│  AI Providers (Anthropic, OpenAI, etc.)  │
+└──────────────────────────────────────────┘
+```
+
+The `upstream` and `providers` sections are mutually exclusive. See `packages/proxy/src/upstream/provider.ts` for the `UpstreamProvider` implementation.
+
 ---
 
 ## 3. Package Architecture
@@ -141,6 +171,8 @@ Middleware is registered via `pipeline.use(middleware)` in a fixed order determi
 **Phase 1 -- Request:** Iterates all middleware where `phase === "request"` or `phase === "both"`, in registration order.
 
 **Provider Forward:** If no middleware short-circuited, the `forwardFn` calls the provider router.
+
+**Provider Forward:** In direct mode, the `forwardFn` calls the provider router. In edge mode, it calls `UpstreamProvider.forward()` which forwards to the upstream Bastion proxy. The pipeline is agnostic to the target.
 
 **Phase 2 -- Response:** Iterates all middleware where `phase === "response"` or `phase === "both"`, in registration order.
 
@@ -391,10 +423,12 @@ All `${ENV_VAR}` tokens in the YAML are replaced with `process.env` values befor
 
 ### Zod Validation
 
-The configuration is validated using a Zod schema (`bastionConfigSchema`) with two refinements:
+The configuration is validated using a Zod schema (`bastionConfigSchema`) with four refinements:
 
-1. `providers.primary` must reference a key in `providers.definitions`.
-2. `providers.fallback` (if set) must also reference a key in `providers.definitions`.
+1. `upstream` and `providers` are mutually exclusive.
+2. At least one of `upstream` or `providers` must be configured.
+3. `providers.primary` (if providers set) must reference a key in `providers.definitions`.
+4. `providers.fallback` (if set) must also reference a key in `providers.definitions`.
 
 Policy conditions use a Zod discriminated union on the `type` field, supporting five condition types: `contains`, `regex`, `injection_score`, `pii_detected`, and `length_exceeds`.
 

@@ -37,9 +37,39 @@ proxy:
 
 ---
 
+## `upstream`
+
+Configure edge proxy mode -- forward requests to an upstream Bastion proxy instead of directly to AI providers. **Mutually exclusive with `providers`** -- use one or the other.
+
+| Field | Type | Required | Default |
+|-------|------|----------|---------|
+| `url` | `string` (URL) | Yes | -- |
+| `proxy_key` | `string` | Yes | -- |
+| `timeout_ms` | `number` | No | `30000` |
+| `forward_agent_headers` | `boolean` | No | `true` |
+
+- **`url`** -- The URL of the upstream Bastion cloud proxy (e.g., `https://api.bastion.cloud`). Requests are forwarded to `{url}/v1/messages` or `{url}/v1/chat/completions` based on the incoming request path.
+- **`proxy_key`** -- Site-level authentication token sent to the upstream proxy as `Authorization: Bearer {proxy_key}`.
+- **`timeout_ms`** -- Maximum time to wait for the upstream proxy to respond before returning a 504 Gateway Timeout.
+- **`forward_agent_headers`** -- When `true`, forwards `X-Bastion-Agent`, `X-Bastion-Team`, `X-Bastion-Env`, and `X-Request-Id` headers to the upstream proxy for per-agent tracking.
+
+When `upstream` is configured, the local proxy runs all enabled middleware (cache, rate limiting, policies, injection detection, audit) before forwarding to the upstream proxy. Cache hits are served locally without contacting the upstream.
+
+```yaml
+upstream:
+  url: "https://api.bastion.cloud"
+  proxy_key: "${BASTION_PROXY_KEY}"
+  timeout_ms: 30000
+  forward_agent_headers: true
+```
+
+See the [Edge Proxy example](../examples/edge-proxy/) for a complete configuration.
+
+---
+
 ## `providers`
 
-Configure LLM providers and fallback.
+Configure LLM providers and fallback. **Mutually exclusive with `upstream`** -- use one or the other.
 
 ### `providers.primary`
 

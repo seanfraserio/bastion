@@ -9,6 +9,7 @@ Bastion is designed to run wherever your application runs. This guide covers com
 | Binary | Local dev, single machine | Low |
 | Docker | Small teams, CI/CD | Medium |
 | Docker Compose | Small teams with Redis cache | Medium |
+| Edge Proxy | Local proxy → cloud Bastion | Medium |
 | Kubernetes Sidecar | Per-service isolation | High |
 | Kubernetes Standalone | Multi-tenant gateway | High |
 | Cluster (Enterprise) | High availability | Enterprise |
@@ -91,6 +92,64 @@ See [`docker/docker-compose.yml`](../docker/docker-compose.yml) and [`docker/doc
 ```bash
 curl -s http://localhost:4000/health | jq .
 ```
+
+---
+
+## Edge Proxy
+
+To run a local Bastion proxy that forwards to an upstream cloud Bastion (instead of directly to AI providers), use edge mode. This gives you local caching, policy enforcement, and audit logging while the cloud handles tenant auth, billing, and provider routing.
+
+```yaml
+# bastion.yaml (edge mode)
+version: "1"
+proxy:
+  port: 4000
+upstream:
+  url: "https://api.bastion.cloud"
+  proxy_key: "${BASTION_PROXY_KEY}"
+  forward_agent_headers: true
+auth:
+  enabled: true
+  tokens:
+    - "${LOCAL_AGENT_TOKEN}"
+cache:
+  enabled: true
+  max_entries: 5000
+audit:
+  enabled: true
+  output: file
+  file_path: ./logs/edge-audit.jsonl
+```
+
+Start the edge proxy:
+
+```bash
+export BASTION_PROXY_KEY=bst_your_key
+export LOCAL_AGENT_TOKEN=your_token
+bastion start
+```
+
+Point your applications at `http://localhost:4000`. Requests flow through the local middleware pipeline, then to the cloud proxy, then to AI providers.
+
+### What runs where
+
+| Local proxy | Cloud proxy |
+|-------------|-------------|
+| Auth (local tokens) | Tenant auth (proxy_key) |
+| Cache | Billing & usage tracking |
+| Rate limiting | Per-agent tracking |
+| Injection detection | Cloud-side policies |
+| Policy enforcement | Provider routing |
+| Audit logging | Provider API keys |
+
+### Verify your deployment
+
+```bash
+curl -s http://localhost:4000/health | jq .
+# Expected: {"status":"ok","mode":"edge","upstream_url":"https://api.bastion.cloud"}
+```
+
+See the [Edge Proxy example](../examples/edge-proxy/) for a complete setup.
 
 ---
 

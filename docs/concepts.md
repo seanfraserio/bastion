@@ -131,6 +131,29 @@ The reason the boundary matters is that it keeps the OSS core simple and depende
 
 See [Enterprise](./enterprise.md) for the full feature reference.
 
+## Edge Proxy Mode
+
+Bastion can operate in **edge mode**, where a local instance runs on the customer's infrastructure and forwards requests to an upstream cloud Bastion proxy instead of directly to AI providers.
+
+In edge mode, the middleware pipeline runs identically -- the only difference is the terminal action. Instead of forwarding to Anthropic or OpenAI, the pipeline forwards to the upstream Bastion proxy. This means all local middleware (caching, rate limiting, injection detection, policies, audit) executes before the request leaves the customer's network.
+
+The reason edge mode exists is to solve three problems with direct-to-cloud routing:
+
+1. **Latency.** A local cache serves repeated prompts without any network round-trip to the cloud. For workloads with prompt reuse, this can eliminate the majority of upstream calls.
+2. **Local control.** Customers can enforce their own policies, rate limits, and audit logging without depending on the cloud proxy's configuration. Security-sensitive organizations can inspect and block requests before they leave their network.
+3. **Bandwidth.** Large prompts and responses only travel over the WAN once. Subsequent cache hits are served locally.
+
+Edge mode is configured with the `upstream` section in `bastion.yaml`, which replaces the `providers` section:
+
+```yaml
+upstream:
+  url: "https://api.bastion.cloud"
+  proxy_key: "${BASTION_PROXY_KEY}"
+  forward_agent_headers: true
+```
+
+Agent identity headers (`X-Bastion-Agent`, `X-Bastion-Team`, `X-Bastion-Env`) are forwarded to the cloud proxy so it can track per-agent usage for billing and audit, even though authentication is handled at the site level via `proxy_key`.
+
 ## Forge Integration
 
 Bastion is designed to work seamlessly with [Forge](https://github.com/your-org/forge), the agent orchestration framework. The integration is straightforward because Bastion acts as a transparent proxy -- any application that makes HTTP calls to an LLM provider can route those calls through Bastion instead.
