@@ -18,15 +18,26 @@ export function registerValidateCommand(program: Command): void {
         console.log(`  port:      ${config.proxy.port}`);
         console.log(`  log_level: ${config.proxy.log_level}`);
 
+        // Mode section
+        if (config.upstream) {
+          console.log("\n[upstream] (edge mode)");
+          console.log(`  url:                    ${config.upstream.url}`);
+          console.log(`  proxy_key:              ****${config.upstream.proxy_key.slice(-4)}`);
+          console.log(`  timeout_ms:             ${config.upstream.timeout_ms}`);
+          console.log(`  forward_agent_headers:  ${config.upstream.forward_agent_headers}`);
+        }
+
         // Providers section
-        console.log("\n[providers]");
-        console.log(`  primary:  ${config.providers.primary}`);
-        console.log(`  fallback: ${config.providers.fallback ?? "(none)"}`);
-        for (const [name, def] of Object.entries(config.providers.definitions)) {
-          console.log(`  [providers.definitions.${name}]`);
-          console.log(`    api_key:    ${!def.api_key ? "(not set)" : def.api_key.length <= 4 ? "****" : "****" + def.api_key.slice(-4)}`);
-          if (def.base_url) console.log(`    base_url:   ${def.base_url}`);
-          if (def.timeout_ms) console.log(`    timeout_ms: ${def.timeout_ms}`);
+        if (config.providers) {
+          console.log("\n[providers]");
+          console.log(`  primary:  ${config.providers.primary}`);
+          console.log(`  fallback: ${config.providers.fallback ?? "(none)"}`);
+          for (const [name, def] of Object.entries(config.providers.definitions)) {
+            console.log(`  [providers.definitions.${name}]`);
+            console.log(`    api_key:    ${!def.api_key ? "(not set)" : def.api_key.length <= 4 ? "****" : "****" + def.api_key.slice(-4)}`);
+            if (def.base_url) console.log(`    base_url:   ${def.base_url}`);
+            if (def.timeout_ms) console.log(`    timeout_ms: ${def.timeout_ms}`);
+          }
         }
 
         // Cache section
