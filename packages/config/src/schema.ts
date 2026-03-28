@@ -157,6 +157,17 @@ export const lanternSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// Redis
+// ---------------------------------------------------------------------------
+
+export const redisSchema = z.object({
+  enabled: z.boolean().default(false),
+  url: z.string().default("redis://localhost:6379"),
+  key_prefix: z.string().default("bastion:"),
+  connect_timeout_ms: z.number().int().positive().default(5000),
+});
+
+// ---------------------------------------------------------------------------
 // Upstream (edge proxy mode)
 // ---------------------------------------------------------------------------
 
@@ -193,6 +204,7 @@ export const bastionConfigSchema = z.object({
   policies: z.array(policySchema).optional(),
   audit: auditSchema.optional(),
   lantern: lanternSchema.optional(),
+  redis: redisSchema.optional(),
 }).refine(
   (data) => !(data.upstream && data.providers),
   { message: "upstream and providers are mutually exclusive — use one or the other" },
