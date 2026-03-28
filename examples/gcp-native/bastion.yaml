@@ -1,0 +1,38 @@
+# bastion.yaml — GCP-native stack (Pub/Sub audit + Redis cache/rate-limit)
+
+providers:
+  primary:
+    type: anthropic
+    api_key: ${ANTHROPIC_API_KEY}
+  fallback:
+    type: openai
+    api_key: ${OPENAI_API_KEY}
+
+redis:
+  enabled: true
+  url: ${REDIS_URL}
+  key_prefix: "bastion:"
+
+rate_limits:
+  enabled: true
+  requests_per_minute: 100
+  agents:
+    - name: research-agent
+      requests_per_minute: 200
+    - name: chat-agent
+      requests_per_minute: 50
+
+cache:
+  enabled: true
+  ttl_seconds: 3600
+
+audit:
+  enabled: true
+  output: pubsub
+  pubsub_topic: bastion-audit
+  pubsub_project_id: ${GCP_PROJECT_ID}
+  pubsub_ordering_key: agent
+
+injection_detection:
+  threshold: 0.3
+  action: block
