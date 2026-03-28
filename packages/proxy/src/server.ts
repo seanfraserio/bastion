@@ -205,6 +205,7 @@ async function buildPipeline(config: BastionConfig): Promise<{
   exporter: IAuditExporter | undefined;
   providerRouter: ProviderRouter | undefined;
   upstreamProvider: UpstreamProvider | undefined;
+  redisClient: { quit(): Promise<unknown> } | undefined;
 }> {
   let providerRouter: ProviderRouter | undefined;
   let upstreamProvider: UpstreamProvider | undefined;
@@ -220,12 +221,42 @@ async function buildPipeline(config: BastionConfig): Promise<{
 
   const pipeline = new Pipeline(forwardFn);
 
+  // Create Redis client if configured — used for distributed rate limiting and caching
+  let redisClient: { quit(): Promise<unknown> } | undefined;
+  let redisInstance: import("ioredis").default | undefined;
+
+  if (config.redis?.enabled) {
+    const { createRedisClient } = await import("./lib/redis.js");
+    redisInstance = createRedisClient({
+      url: config.redis.url,
+      keyPrefix: config.redis.key_prefix,
+      connectTimeoutMs: config.redis.connect_timeout_ms,
+    });
+    redisClient = redisInstance;
+  }
+
   // Order: rate-limit -> injection -> policy(request) -> cache(request)
   //        -> [provider]
   //        -> cache(response) -> pii-redact -> policy(response) -> audit
 
   if (config.rate_limits?.enabled !== false) {
-    pipeline.use(new RateLimitMiddleware(config));
+    if (redisInstance) {
+      const { RedisRateLimitMiddleware } = await import("./middleware/redis-rate-limit.js");
+      const agentOverrides: Record<string, number> = {};
+      if (config.rate_limits?.agents) {
+        for (const agent of config.rate_limits.agents) {
+          if (agent.requests_per_minute != null) {
+            agentOverrides[agent.name] = agent.requests_per_minute;
+          }
+        }
+      }
+      pipeline.use(new RedisRateLimitMiddleware(redisInstance, {
+        requestsPerMinute: config.rate_limits?.requests_per_minute ?? 60,
+        agentOverrides,
+      }));
+    } else {
+      pipeline.use(new RateLimitMiddleware(config));
+    }
   }
 
   pipeline.use(new InjectionDetectorMiddleware());
@@ -235,7 +266,14 @@ async function buildPipeline(config: BastionConfig): Promise<{
 
   const cacheMiddleware = new CacheMiddleware(config);
   if (config.cache?.enabled !== false) {
-    pipeline.use(cacheMiddleware);
+    if (redisInstance) {
+      const { RedisCacheMiddleware } = await import("./middleware/redis-cache.js");
+      pipeline.use(new RedisCacheMiddleware(redisInstance, {
+        ttlSeconds: config.cache?.ttl_seconds ?? 300,
+      }));
+    } else {
+      pipeline.use(cacheMiddleware);
+    }
   }
 
   pipeline.use(new PiiRedactMiddleware());
@@ -246,7 +284,7 @@ async function buildPipeline(config: BastionConfig): Promise<{
     pipeline.use(new AuditMiddleware(config, exporter));
   }
 
-  return { pipeline, cacheMiddleware, exporter, providerRouter, upstreamProvider };
+  return { pipeline, cacheMiddleware, exporter, providerRouter, upstreamProvider, redisClient };
 }
 
 export async function createServer(configPath?: string) {
@@ -269,7 +307,7 @@ export async function createServer(configPath?: string) {
     bodyLimit: 10 * 1024 * 1024, // 10MB — generous for multi-turn LLM conversations
   });
 
-  let { pipeline, cacheMiddleware, exporter, providerRouter, upstreamProvider } = await buildPipeline(config);
+  let { pipeline, cacheMiddleware, exporter, providerRouter, upstreamProvider, redisClient } = await buildPipeline(config);
 
   // Observability: send metrics + logs to Grafana Cloud via OTLP
   registerObservability(app, "bastion-proxy");
@@ -516,9 +554,10 @@ export async function createServer(configPath?: string) {
     };
   });
 
-  // Graceful shutdown: flush exporters and close on signals
+  // Graceful shutdown: flush exporters, close Redis, and clean up
   app.addHook("onClose", async () => {
     await exporter?.shutdown?.();
+    await redisClient?.quit();
   });
 
   const shutdownGracefully = async () => {
@@ -534,11 +573,13 @@ export async function createServer(configPath?: string) {
       const newConfig = await loadConfig(resolvedPath);
       const rebuilt = await buildPipeline(newConfig);
       await exporter?.shutdown?.();
+      await redisClient?.quit();
       pipeline = rebuilt.pipeline;
       cacheMiddleware = rebuilt.cacheMiddleware;
       exporter = rebuilt.exporter;
       providerRouter = rebuilt.providerRouter;
       upstreamProvider = rebuilt.upstreamProvider;
+      redisClient = rebuilt.redisClient;
       app.log.info("Configuration reloaded successfully");
     } catch (err) {
       app.log.error(
