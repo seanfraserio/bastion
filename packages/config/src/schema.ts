@@ -130,7 +130,7 @@ export type Policy = z.infer<typeof policySchema>;
 // Audit
 // ---------------------------------------------------------------------------
 
-export const auditOutputSchema = z.enum(["file", "stdout", "http"]);
+export const auditOutputSchema = z.enum(["file", "stdout", "http", "pubsub"]);
 
 export const auditSchema = z.object({
   enabled: z.boolean().default(true),
@@ -138,6 +138,9 @@ export const auditSchema = z.object({
   file_path: z.string().optional(),
   endpoint: z.string().url().optional(),
   headers: z.record(z.string(), z.string()).optional(),
+  pubsub_topic: z.string().optional(),
+  pubsub_project_id: z.string().optional(),
+  pubsub_ordering_key: z.string().optional(),
   include_request_body: z.boolean().default(false),
   include_response_body: z.boolean().default(false),
 });

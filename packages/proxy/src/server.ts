@@ -179,25 +179,33 @@ function extractBearerToken(
   return undefined;
 }
 
-function createAuditExporter(config: BastionConfig): IAuditExporter {
+async function createAuditExporter(config: BastionConfig): Promise<IAuditExporter> {
   switch (config.audit?.output) {
     case "file":
       return new FileExporter(config.audit.file_path ?? "./logs/audit.jsonl");
     case "http":
       return new HttpExporter(config.audit.endpoint ?? "", config.audit.headers);
+    case "pubsub": {
+      const { PubSubExporter } = await import("./exporters/pubsub.js");
+      return new PubSubExporter({
+        topicName: config.audit.pubsub_topic ?? "bastion-audit",
+        projectId: config.audit.pubsub_project_id,
+        orderingKey: config.audit.pubsub_ordering_key,
+      });
+    }
     case "stdout":
     default:
       return new StdoutExporter();
   }
 }
 
-function buildPipeline(config: BastionConfig): {
+async function buildPipeline(config: BastionConfig): Promise<{
   pipeline: Pipeline;
   cacheMiddleware: CacheMiddleware;
   exporter: IAuditExporter | undefined;
   providerRouter: ProviderRouter | undefined;
   upstreamProvider: UpstreamProvider | undefined;
-} {
+}> {
   let providerRouter: ProviderRouter | undefined;
   let upstreamProvider: UpstreamProvider | undefined;
   let forwardFn: ForwardFn;
@@ -234,7 +242,7 @@ function buildPipeline(config: BastionConfig): {
 
   let exporter: IAuditExporter | undefined;
   if (config.audit?.enabled !== false) {
-    exporter = createAuditExporter(config);
+    exporter = await createAuditExporter(config);
     pipeline.use(new AuditMiddleware(config, exporter));
   }
 
@@ -261,7 +269,7 @@ export async function createServer(configPath?: string) {
     bodyLimit: 10 * 1024 * 1024, // 10MB — generous for multi-turn LLM conversations
   });
 
-  let { pipeline, cacheMiddleware, exporter, providerRouter, upstreamProvider } = buildPipeline(config);
+  let { pipeline, cacheMiddleware, exporter, providerRouter, upstreamProvider } = await buildPipeline(config);
 
   // Observability: send metrics + logs to Grafana Cloud via OTLP
   registerObservability(app, "bastion-proxy");
@@ -524,7 +532,7 @@ export async function createServer(configPath?: string) {
   async function handleSighup(): Promise<void> {
     try {
       const newConfig = await loadConfig(resolvedPath);
-      const rebuilt = buildPipeline(newConfig);
+      const rebuilt = await buildPipeline(newConfig);
       await exporter?.shutdown?.();
       pipeline = rebuilt.pipeline;
       cacheMiddleware = rebuilt.cacheMiddleware;
