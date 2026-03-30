@@ -1,4 +1,4 @@
-export type ProviderName = "anthropic" | "openai" | "ollama" | "bedrock";
+export type ProviderName = "anthropic" | "openai" | "google" | "ollama" | "bedrock" | "mistral" | "cohere";
 export type PolicyAction = "block" | "warn" | "redact" | "tag";
 
 export interface PipelineContext {
