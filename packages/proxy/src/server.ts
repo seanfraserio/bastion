@@ -29,6 +29,7 @@ import { registerSecurityHeaders } from "./lib/security-headers.js";
 import { UpstreamProvider } from "./upstream/provider.js";
 import type { ForwardFn } from "./pipeline/index.js";
 import type { StreamingResponse } from "./pipeline/types.js";
+import type { Pool } from "pg";
 
 let VERSION = "0.0.0";
 try {
@@ -207,6 +208,7 @@ async function buildPipeline(config: BastionConfig): Promise<{
   providerRouter: ProviderRouter | undefined;
   upstreamProvider: UpstreamProvider | undefined;
   redisClient: { quit(): Promise<unknown> } | undefined;
+  pgRateLimiter: { destroy(): void } | undefined;
 }> {
   let providerRouter: ProviderRouter | undefined;
   let upstreamProvider: UpstreamProvider | undefined;
@@ -236,12 +238,26 @@ async function buildPipeline(config: BastionConfig): Promise<{
     redisClient = redisInstance;
   }
 
+  // Create Postgres pool for rate limiting if DATABASE_URL is set (enterprise default)
+  let pgPool: Pool | undefined;
+  let pgRateLimiter: { destroy(): void } | undefined;
+  const databaseUrl = process.env.DATABASE_URL;
+
+  if (databaseUrl && !config.redis?.enabled) {
+    const { Pool: PgPool } = await import("pg");
+    pgPool = new PgPool({
+      connectionString: databaseUrl,
+      max: 5,
+    });
+  }
+
   // Order: rate-limit -> injection -> policy(request) -> cache(request)
   //        -> [provider]
   //        -> cache(response) -> pii-redact -> policy(response) -> audit
 
   if (config.rate_limits?.enabled !== false) {
     if (redisInstance) {
+      // Redis path unchanged
       const { RedisRateLimitMiddleware } = await import("./middleware/redis-rate-limit.js");
       const agentOverrides: Record<string, number> = {};
       if (config.rate_limits?.agents) {
@@ -255,6 +271,23 @@ async function buildPipeline(config: BastionConfig): Promise<{
         requestsPerMinute: config.rate_limits?.requests_per_minute ?? 60,
         agentOverrides,
       }));
+    } else if (pgPool) {
+      // Postgres path (new — enterprise default)
+      const { PostgresRateLimitMiddleware } = await import("./middleware/postgres-rate-limit.js");
+      const agentOverrides: Record<string, number> = {};
+      if (config.rate_limits?.agents) {
+        for (const agent of config.rate_limits.agents) {
+          if (agent.requests_per_minute != null) {
+            agentOverrides[agent.name] = agent.requests_per_minute;
+          }
+        }
+      }
+      const pgMiddleware = new PostgresRateLimitMiddleware(pgPool, {
+        requestsPerMinute: config.rate_limits?.requests_per_minute ?? 60,
+        agentOverrides,
+      });
+      pgRateLimiter = pgMiddleware;
+      pipeline.use(pgMiddleware);
     } else {
       pipeline.use(new RateLimitMiddleware(config));
     }
@@ -285,7 +318,7 @@ async function buildPipeline(config: BastionConfig): Promise<{
     pipeline.use(new AuditMiddleware(config, exporter));
   }
 
-  return { pipeline, cacheMiddleware, exporter, providerRouter, upstreamProvider, redisClient };
+  return { pipeline, cacheMiddleware, exporter, providerRouter, upstreamProvider, redisClient, pgRateLimiter };
 }
 
 export async function createServer(configPath?: string) {
@@ -308,7 +341,7 @@ export async function createServer(configPath?: string) {
     bodyLimit: 10 * 1024 * 1024, // 10MB — generous for multi-turn LLM conversations
   });
 
-  let { pipeline, cacheMiddleware, exporter, providerRouter, upstreamProvider, redisClient } = await buildPipeline(config);
+  let { pipeline, cacheMiddleware, exporter, providerRouter, upstreamProvider, redisClient, pgRateLimiter } = await buildPipeline(config);
 
   // Observability: send metrics + logs to Grafana Cloud via OTLP
   registerObservability(app, "bastion-proxy");
@@ -550,10 +583,11 @@ export async function createServer(configPath?: string) {
     };
   });
 
-  // Graceful shutdown: flush exporters, close Redis, and clean up
+  // Graceful shutdown: flush exporters, close Redis, close Postgres pool, and clean up
   app.addHook("onClose", async () => {
     await exporter?.shutdown?.();
     await redisClient?.quit();
+    pgRateLimiter?.destroy();
   });
 
   const shutdownGracefully = async () => {
@@ -570,12 +604,14 @@ export async function createServer(configPath?: string) {
       const rebuilt = await buildPipeline(newConfig);
       await exporter?.shutdown?.();
       await redisClient?.quit();
+      pgRateLimiter?.destroy();
       pipeline = rebuilt.pipeline;
       cacheMiddleware = rebuilt.cacheMiddleware;
       exporter = rebuilt.exporter;
       providerRouter = rebuilt.providerRouter;
       upstreamProvider = rebuilt.upstreamProvider;
       redisClient = rebuilt.redisClient;
+      pgRateLimiter = rebuilt.pgRateLimiter;
       app.log.info("Configuration reloaded successfully");
     } catch (err) {
       app.log.error(
