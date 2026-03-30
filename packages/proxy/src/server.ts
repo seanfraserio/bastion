@@ -256,36 +256,25 @@ async function buildPipeline(config: BastionConfig): Promise<{
   //        -> cache(response) -> pii-redact -> policy(response) -> audit
 
   if (config.rate_limits?.enabled !== false) {
+    const agentOverrides: Record<string, number> = {};
+    if (config.rate_limits?.agents) {
+      for (const agent of config.rate_limits.agents) {
+        if (agent.requests_per_minute != null) {
+          agentOverrides[agent.name] = agent.requests_per_minute;
+        }
+      }
+    }
+    const rateLimitOpts = {
+      requestsPerMinute: config.rate_limits?.requests_per_minute ?? 60,
+      agentOverrides,
+    };
+
     if (redisInstance) {
-      // Redis path unchanged
       const { RedisRateLimitMiddleware } = await import("./middleware/redis-rate-limit.js");
-      const agentOverrides: Record<string, number> = {};
-      if (config.rate_limits?.agents) {
-        for (const agent of config.rate_limits.agents) {
-          if (agent.requests_per_minute != null) {
-            agentOverrides[agent.name] = agent.requests_per_minute;
-          }
-        }
-      }
-      pipeline.use(new RedisRateLimitMiddleware(redisInstance, {
-        requestsPerMinute: config.rate_limits?.requests_per_minute ?? 60,
-        agentOverrides,
-      }));
+      pipeline.use(new RedisRateLimitMiddleware(redisInstance, rateLimitOpts));
     } else if (pgPool) {
-      // Postgres path (new — enterprise default)
       const { PostgresRateLimitMiddleware } = await import("./middleware/postgres-rate-limit.js");
-      const agentOverrides: Record<string, number> = {};
-      if (config.rate_limits?.agents) {
-        for (const agent of config.rate_limits.agents) {
-          if (agent.requests_per_minute != null) {
-            agentOverrides[agent.name] = agent.requests_per_minute;
-          }
-        }
-      }
-      const pgMiddleware = new PostgresRateLimitMiddleware(pgPool, {
-        requestsPerMinute: config.rate_limits?.requests_per_minute ?? 60,
-        agentOverrides,
-      });
+      const pgMiddleware = new PostgresRateLimitMiddleware(pgPool, rateLimitOpts);
       pgRateLimiter = pgMiddleware;
       pipeline.use(pgMiddleware);
     } else {
