@@ -25,6 +25,7 @@ import { FileExporter } from "./exporters/file.js";
 import { StdoutExporter } from "./exporters/stdout.js";
 import { HttpExporter } from "./exporters/http.js";
 import { registerObservability, recordMetric } from "./observability.js";
+import { registerSecurityHeaders } from "./lib/security-headers.js";
 import { UpstreamProvider } from "./upstream/provider.js";
 import type { ForwardFn } from "./pipeline/index.js";
 import type { StreamingResponse } from "./pipeline/types.js";
@@ -338,12 +339,7 @@ export async function createServer(configPath?: string) {
   });
 
   // Security headers
-  app.addHook("onSend", async (_request, reply) => {
-    reply.header("X-Content-Type-Options", "nosniff");
-    reply.header("Cache-Control", "no-store");
-    reply.header("X-Frame-Options", "DENY");
-    reply.header("Referrer-Policy", "strict-origin-when-cross-origin");
-  });
+  await registerSecurityHeaders(app, { hsts: false });
 
   // Proxy handler factory
   function createProxyHandler(defaultProvider: ProviderName) {
