@@ -40,6 +40,8 @@ export { InjectionDetectorMiddleware, scoreInjection } from "./middleware/inject
 export { PiiRedactMiddleware } from "./middleware/pii-redact.js";
 export { PolicyMiddleware } from "./middleware/policy.js";
 export { AuditMiddleware } from "./middleware/audit.js";
+export { PostgresRateLimitMiddleware } from "./middleware/postgres-rate-limit.js";
+export type { PostgresRateLimitOptions } from "./middleware/postgres-rate-limit.js";
 
 // Exporters
 export type { IAuditExporter } from "./exporters/types.js";
