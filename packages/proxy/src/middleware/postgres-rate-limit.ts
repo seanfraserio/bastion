@@ -10,41 +10,28 @@ export interface PostgresRateLimitOptions {
   agentOverrides?: Record<string, number>;
 }
 
+const WINDOW_MS = 60_000;
+
+const MIGRATE_SQL = `DROP TABLE IF EXISTS rate_limits`;
+
 const CREATE_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS rate_limits (
-    identity TEXT PRIMARY KEY,
-    window_start TIMESTAMPTZ NOT NULL,
-    count INT NOT NULL DEFAULT 1
+    key TEXT NOT NULL,
+    count INTEGER NOT NULL DEFAULT 1,
+    window_start BIGINT NOT NULL,
+    PRIMARY KEY (key, window_start)
   )
 `;
 
-const CREATE_INDEX_SQL = `
-  CREATE INDEX IF NOT EXISTS rate_limits_window_start_idx
-  ON rate_limits (window_start)
-`;
-
 const UPSERT_SQL = `
-  INSERT INTO rate_limits (identity, window_start, count)
-  VALUES ($1, NOW(), 1)
-  ON CONFLICT (identity) DO UPDATE SET
-    count = CASE
-      WHEN rate_limits.window_start > NOW() - INTERVAL '60 seconds'
-      THEN rate_limits.count + 1
-      ELSE 1
-    END,
-    window_start = CASE
-      WHEN rate_limits.window_start > NOW() - INTERVAL '60 seconds'
-      THEN rate_limits.window_start
-      ELSE NOW()
-    END
-  RETURNING count,
-    GREATEST(0, EXTRACT(EPOCH FROM (rate_limits.window_start + INTERVAL '60 seconds' - NOW()))::INT) AS ttl
+  INSERT INTO rate_limits (key, count, window_start)
+  VALUES ($1, 1, $2)
+  ON CONFLICT (key, window_start)
+  DO UPDATE SET count = rate_limits.count + 1
+  RETURNING count
 `;
 
-const CLEANUP_SQL = `
-  DELETE FROM rate_limits
-  WHERE window_start < NOW() - INTERVAL '2 minutes'
-`;
+const CLEANUP_SQL = `DELETE FROM rate_limits WHERE window_start < $1`;
 
 export class PostgresRateLimitMiddleware implements PipelineMiddleware {
   readonly name = "postgres-rate-limit";
@@ -62,7 +49,8 @@ export class PostgresRateLimitMiddleware implements PipelineMiddleware {
     this.agentOverrides = options.agentOverrides ?? {};
 
     this.cleanupTimer = setInterval(() => {
-      this.pool.query(CLEANUP_SQL).catch((err: unknown) => {
+      const cutoff = Date.now() - 5 * 60_000;
+      this.pool.query(CLEANUP_SQL, [cutoff]).catch((err: unknown) => {
         console.error(
           "[bastion] Postgres rate-limit cleanup error:",
           err instanceof Error ? err.message : err,
@@ -73,8 +61,9 @@ export class PostgresRateLimitMiddleware implements PipelineMiddleware {
 
   private async ensureSchema(): Promise<void> {
     if (this.schemaReady) return;
+    // Migrate from old TIMESTAMPTZ schema if it exists
+    await this.pool.query(MIGRATE_SQL);
     await this.pool.query(CREATE_TABLE_SQL);
-    await this.pool.query(CREATE_INDEX_SQL);
     this.schemaReady = true;
   }
 
@@ -89,12 +78,13 @@ export class PostgresRateLimitMiddleware implements PipelineMiddleware {
     try {
       await this.ensureSchema();
 
-      const result = await this.pool.query(UPSERT_SQL, [identity]);
-      const row = result.rows[0] as { count: number; ttl: number };
-      const { count, ttl } = row;
+      const windowStart = Math.floor(Date.now() / WINDOW_MS) * WINDOW_MS;
+      const result = await this.pool.query(UPSERT_SQL, [identity, windowStart]);
+      const count = result.rows[0].count as number;
 
       if (count > limit) {
-        ctx.metadata.retryAfterSeconds = ttl;
+        const retryAfterMs = windowStart + WINDOW_MS - Date.now();
+        ctx.metadata.retryAfterSeconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
         return {
           action: "block",
           reason: "Rate limit exceeded. Try again later.",

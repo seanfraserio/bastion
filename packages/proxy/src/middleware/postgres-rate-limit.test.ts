@@ -6,7 +6,7 @@ import { makeMockContext } from "../__tests__/helpers/mock-context.js";
 function makeMockPool(queryResult?: Partial<QueryResult>): Pool {
   return {
     query: vi.fn().mockResolvedValue({
-      rows: [{ count: 1, ttl: 60 }],
+      rows: [{ count: 1 }],
       ...queryResult,
     }),
   } as unknown as Pool;
@@ -34,16 +34,37 @@ describe("PostgresRateLimitMiddleware", () => {
     expect(middleware.phase).toBe("request");
   });
 
-  it("creates rate_limits table on first process() call (CREATE TABLE IF NOT EXISTS)", async () => {
+  it("migrates old table and creates new schema on first process() call", async () => {
     const ctx = makeMockContext();
     await middleware.process(ctx);
 
     const allCalls = (pool.query as ReturnType<typeof vi.fn>).mock.calls;
+    const dropCall = allCalls.find(
+      (call: unknown[]) =>
+        typeof call[0] === "string" && call[0].includes("DROP TABLE IF EXISTS"),
+    );
     const createTableCall = allCalls.find(
       (call: unknown[]) =>
         typeof call[0] === "string" && call[0].includes("CREATE TABLE IF NOT EXISTS"),
     );
+    expect(dropCall).toBeDefined();
     expect(createTableCall).toBeDefined();
+  });
+
+  it("uses BIGINT window_start with composite PK in schema", async () => {
+    const ctx = makeMockContext();
+    await middleware.process(ctx);
+
+    const allCalls = (pool.query as ReturnType<typeof vi.fn>).mock.calls;
+    const createCall = allCalls.find(
+      (call: unknown[]) =>
+        typeof call[0] === "string" && call[0].includes("CREATE TABLE"),
+    );
+    expect(createCall).toBeDefined();
+    const sql = createCall![0] as string;
+    expect(sql).toContain("window_start BIGINT");
+    expect(sql).toContain("PRIMARY KEY (key, window_start)");
+    expect(sql).not.toContain("TIMESTAMPTZ");
   });
 
   it("skips schema creation on subsequent calls", async () => {
@@ -66,8 +87,29 @@ describe("PostgresRateLimitMiddleware", () => {
     expect(result.action).toBe("continue");
   });
 
-  it("blocks when over limit (count=61, limit=60) → 429 with Retry-After", async () => {
-    pool = makeMockPool({ rows: [{ count: 61, ttl: 45 }] });
+  it("passes identity and floored windowStart to upsert", async () => {
+    middleware["schemaReady"] = true;
+
+    const now = 1711900000000; // known timestamp
+    vi.setSystemTime(now);
+
+    const ctx = makeMockContext({ agentName: undefined, sourceIp: "10.0.0.1" });
+    await middleware.process(ctx);
+
+    const allCalls = (pool.query as ReturnType<typeof vi.fn>).mock.calls;
+    const upsertCall = allCalls.find(
+      (call: unknown[]) =>
+        typeof call[0] === "string" && call[0].includes("ON CONFLICT"),
+    );
+    expect(upsertCall).toBeDefined();
+    expect(upsertCall![1][0]).toBe("10.0.0.1");
+    // windowStart should be floored to nearest 60_000ms
+    const expectedWindow = Math.floor(now / 60_000) * 60_000;
+    expect(upsertCall![1][1]).toBe(expectedWindow);
+  });
+
+  it("blocks when over limit (count=61, limit=60) → 429 with retryAfterSeconds", async () => {
+    pool = makeMockPool({ rows: [{ count: 61 }] });
     middleware.pool = pool;
     middleware["schemaReady"] = true;
 
@@ -79,11 +121,11 @@ describe("PostgresRateLimitMiddleware", () => {
       expect(result.statusCode).toBe(429);
       expect(result.reason).toContain("Rate limit exceeded");
     }
-    expect(ctx.metadata.retryAfterSeconds).toBe(45);
+    expect(ctx.metadata.retryAfterSeconds).toBeGreaterThanOrEqual(1);
   });
 
   it("allows at exactly the limit boundary (count=60, limit=60)", async () => {
-    pool = makeMockPool({ rows: [{ count: 60, ttl: 30 }] });
+    pool = makeMockPool({ rows: [{ count: 60 }] });
     middleware.pool = pool;
     middleware["schemaReady"] = true;
 
@@ -94,7 +136,7 @@ describe("PostgresRateLimitMiddleware", () => {
   });
 
   it("blocks one past the limit (count=61)", async () => {
-    pool = makeMockPool({ rows: [{ count: 61, ttl: 30 }] });
+    pool = makeMockPool({ rows: [{ count: 61 }] });
     middleware.pool = pool;
     middleware["schemaReady"] = true;
 
@@ -105,11 +147,11 @@ describe("PostgresRateLimitMiddleware", () => {
     if (result.action === "block") {
       expect(result.statusCode).toBe(429);
     }
-    expect(ctx.metadata.retryAfterSeconds).toBe(30);
+    expect(ctx.metadata.retryAfterSeconds).toBeGreaterThanOrEqual(1);
   });
 
   it("uses agent-specific limits when configured (agentOverrides)", async () => {
-    pool = makeMockPool({ rows: [{ count: 1, ttl: 60 }] });
+    pool = makeMockPool({ rows: [{ count: 1 }] });
     const mw = new PostgresRateLimitMiddleware(pool, {
       requestsPerMinute: 60,
       agentOverrides: { "slow-agent": 10 },
@@ -120,7 +162,6 @@ describe("PostgresRateLimitMiddleware", () => {
 
     expect(result.action).toBe("continue");
 
-    // The upsert call should have $1 = "slow-agent"
     const allCalls = (pool.query as ReturnType<typeof vi.fn>).mock.calls;
     const upsertCall = allCalls.find(
       (call: unknown[]) =>
@@ -184,8 +225,7 @@ describe("PostgresRateLimitMiddleware", () => {
     consoleSpy.mockRestore();
   });
 
-  it("runs cleanup DELETE on timer interval", async () => {
-    // The cleanup timer fires every 60 seconds
+  it("runs cleanup DELETE with epoch cutoff on timer interval", async () => {
     await vi.advanceTimersByTimeAsync(60_000);
 
     const allCalls = (pool.query as ReturnType<typeof vi.fn>).mock.calls;
@@ -194,6 +234,9 @@ describe("PostgresRateLimitMiddleware", () => {
         typeof call[0] === "string" && call[0].includes("DELETE"),
     );
     expect(cleanupCall).toBeDefined();
+    // Cleanup passes epoch cutoff as parameter, not SQL INTERVAL
+    expect(cleanupCall![1]).toBeDefined();
+    expect(typeof cleanupCall![1][0]).toBe("number");
   });
 
   it("destroy() clears the cleanup timer", async () => {
@@ -203,7 +246,6 @@ describe("PostgresRateLimitMiddleware", () => {
     await vi.advanceTimersByTimeAsync(60_000);
     const callCountAfter = (pool.query as ReturnType<typeof vi.fn>).mock.calls.length;
 
-    // No cleanup calls should have been made after destroy
     const cleanupCalls = (pool.query as ReturnType<typeof vi.fn>).mock.calls
       .slice(callCountBefore)
       .filter(
