@@ -431,6 +431,8 @@ export async function createServer(configPath?: string) {
             "X-Content-Type-Options": "nosniff",
             "X-Frame-Options": "DENY",
             "X-Request-Id": reqResult.requestId,
+            "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+            "Referrer-Policy": "strict-origin-when-cross-origin",
           });
 
           // Pipe stream to client
