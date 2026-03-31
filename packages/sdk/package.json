@@ -1,6 +1,6 @@
 {
   "name": "@openbastion-ai/sdk",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Typed admin API client for Bastion",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

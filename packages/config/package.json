@@ -1,6 +1,6 @@
 {
   "name": "@openbastion-ai/config",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Configuration schema and loader for Bastion",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

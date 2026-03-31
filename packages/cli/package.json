@@ -1,6 +1,6 @@
 {
   "name": "@openbastion-ai/cli",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "CLI binary for Bastion",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
