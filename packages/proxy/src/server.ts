@@ -278,7 +278,7 @@ async function buildPipeline(config: BastionConfig): Promise<{
       pgRateLimiter = pgMiddleware;
       pipeline.use(pgMiddleware);
     } else {
-      pipeline.use(new RateLimitMiddleware(config));
+      pipeline.use(new RateLimitMiddleware(rateLimitOpts));
     }
   }
 
@@ -291,9 +291,7 @@ async function buildPipeline(config: BastionConfig): Promise<{
   if (config.cache?.enabled !== false) {
     if (redisInstance) {
       const { RedisCacheMiddleware } = await import("./middleware/redis-cache.js");
-      pipeline.use(new RedisCacheMiddleware(redisInstance, {
-        ttlSeconds: config.cache?.ttl_seconds ?? 300,
-      }));
+      pipeline.use(new RedisCacheMiddleware(redisInstance, config.cache?.ttl_seconds ?? 300));
     } else {
       pipeline.use(cacheMiddleware);
     }

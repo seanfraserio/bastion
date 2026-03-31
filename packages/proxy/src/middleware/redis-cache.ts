@@ -6,10 +6,6 @@ import type {
   PipelineMiddlewareResult,
 } from "../pipeline/types.js";
 
-export interface RedisCacheOptions {
-  ttlSeconds: number;
-}
-
 export class RedisCacheMiddleware implements PipelineMiddleware {
   readonly name = "redis-cache";
   readonly phase = "both" as const;
@@ -17,9 +13,9 @@ export class RedisCacheMiddleware implements PipelineMiddleware {
   private redis: Redis;
   private ttlSeconds: number;
 
-  constructor(redis: Redis, options: RedisCacheOptions) {
+  constructor(redis: Redis, ttlSeconds: number) {
     this.redis = redis;
-    this.ttlSeconds = options.ttlSeconds;
+    this.ttlSeconds = ttlSeconds;
   }
 
   private computeKey(ctx: PipelineContext): string {

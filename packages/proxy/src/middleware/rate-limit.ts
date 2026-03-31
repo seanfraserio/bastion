@@ -1,14 +1,16 @@
-import pino from "pino";
-import type { BastionConfig } from "@openbastion-ai/config";
 import type {
   PipelineContext,
   PipelineMiddleware,
   PipelineMiddlewareResult,
 } from "../pipeline/types.js";
 
-const logger = pino({ name: "bastion:rate-limit" });
-
 const MAX_BUCKETS = 10_000;
+
+export interface RateLimitOptions {
+  requestsPerMinute: number;
+  tokensPerMinute?: number;
+  agentOverrides?: Record<string, number>;
+}
 
 interface TokenBucket {
   tokens: number;
@@ -24,29 +26,16 @@ export class RateLimitMiddleware implements PipelineMiddleware {
   private buckets = new Map<string, TokenBucket>();
   private globalRequestsPerMinute: number;
   private globalTokensPerMinute: number;
-  private agentOverrides: Map<string, { rpm?: number; tpm?: number }>;
+  private agentOverrides: Map<string, { rpm?: number }>;
 
-  constructor(config: BastionConfig) {
-    const rl = config.rate_limits;
-    this.globalRequestsPerMinute = rl?.requests_per_minute ?? 60;
-    this.globalTokensPerMinute = rl?.tokens_per_minute ?? 100_000;
+  constructor(options: RateLimitOptions) {
+    this.globalRequestsPerMinute = options.requestsPerMinute;
+    this.globalTokensPerMinute = options.tokensPerMinute ?? 100_000;
     this.agentOverrides = new Map();
 
-    // Warn if tokens_per_minute is configured globally
-    if (rl?.tokens_per_minute) {
-      logger.warn("Warning: tokens_per_minute is not yet enforced. Only requests_per_minute is active.");
-    }
-
-    if (rl?.agents) {
-      for (const agent of rl.agents) {
-        // Warn if tokens_per_minute is configured per agent
-        if (agent.tokens_per_minute) {
-          logger.warn(`Warning: tokens_per_minute is not yet enforced. Only requests_per_minute is active.`);
-        }
-        this.agentOverrides.set(agent.name, {
-          rpm: agent.requests_per_minute,
-          tpm: agent.tokens_per_minute,
-        });
+    if (options.agentOverrides) {
+      for (const [name, rpm] of Object.entries(options.agentOverrides)) {
+        this.agentOverrides.set(name, { rpm });
       }
     }
   }
@@ -70,13 +59,12 @@ export class RateLimitMiddleware implements PipelineMiddleware {
 
       const overrides = this.agentOverrides.get(key);
       const rpm = overrides?.rpm ?? this.globalRequestsPerMinute;
-      const tpm = overrides?.tpm ?? this.globalTokensPerMinute;
 
       bucket = {
         tokens: rpm,
         lastRefill: Date.now(),
         requestsPerMinute: rpm,
-        tokensPerMinute: tpm,
+        tokensPerMinute: this.globalTokensPerMinute,
       };
       this.buckets.set(key, bucket);
     }

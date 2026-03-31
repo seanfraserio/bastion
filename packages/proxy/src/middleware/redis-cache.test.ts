@@ -26,7 +26,7 @@ describe("RedisCacheMiddleware", () => {
 
   beforeEach(() => {
     redis = makeMockRedis();
-    middleware = new RedisCacheMiddleware(redis, { ttlSeconds: 300 });
+    middleware = new RedisCacheMiddleware(redis, 300);
   });
 
   it('has correct name "redis-cache" and phase "both"', () => {

@@ -1,27 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { RateLimitMiddleware } from "./rate-limit.js";
-import type { BastionConfig } from "@openbastion-ai/config";
+import type { RateLimitOptions } from "./rate-limit.js";
 import { makeMockContext } from "../__tests__/helpers/mock-context.js";
 
-function makeMockConfig(
-  overrides: Partial<BastionConfig["rate_limits"]> = {},
-): BastionConfig {
+function makeMockOptions(
+  overrides: Partial<RateLimitOptions> = {},
+): RateLimitOptions {
   return {
-    version: "1",
-    proxy: { port: 3000, host: "127.0.0.1", log_level: "info" },
-    providers: {
-      primary: "anthropic",
-      definitions: {
-        anthropic: { base_url: "https://api.anthropic.com" },
-      },
-    },
-    rate_limits: {
-      enabled: true,
-      requests_per_minute: 60,
-      tokens_per_minute: 100000,
-      ...overrides,
-    },
-  } as BastionConfig;
+    requestsPerMinute: 60,
+    ...overrides,
+  };
 }
 
 describe("RateLimitMiddleware", () => {
@@ -34,16 +22,16 @@ describe("RateLimitMiddleware", () => {
   });
 
   it("allows requests under the limit", async () => {
-    const config = makeMockConfig({ requests_per_minute: 10 });
-    const mw = new RateLimitMiddleware(config);
+    const opts = makeMockOptions({ requestsPerMinute: 10 });
+    const mw = new RateLimitMiddleware(opts);
 
     const result = await mw.process(makeMockContext());
     expect(result.action).toBe("continue");
   });
 
   it("blocks the (n+1)th request when limit is 1/minute", async () => {
-    const config = makeMockConfig({ requests_per_minute: 1 });
-    const mw = new RateLimitMiddleware(config);
+    const opts = makeMockOptions({ requestsPerMinute: 1 });
+    const mw = new RateLimitMiddleware(opts);
 
     // First request should pass
     const result1 = await mw.process(makeMockContext());
@@ -58,8 +46,8 @@ describe("RateLimitMiddleware", () => {
   });
 
   it("resets bucket after 1 minute", async () => {
-    const config = makeMockConfig({ requests_per_minute: 1 });
-    const mw = new RateLimitMiddleware(config);
+    const opts = makeMockOptions({ requestsPerMinute: 1 });
+    const mw = new RateLimitMiddleware(opts);
 
     // Consume the single token
     await mw.process(makeMockContext());
@@ -77,11 +65,11 @@ describe("RateLimitMiddleware", () => {
   });
 
   it("uses agent-specific limit overrides", async () => {
-    const config = makeMockConfig({
-      requests_per_minute: 100,
-      agents: [{ name: "slow-agent", requests_per_minute: 1 }],
+    const opts = makeMockOptions({
+      requestsPerMinute: 100,
+      agentOverrides: { "slow-agent": 1 },
     });
-    const mw = new RateLimitMiddleware(config);
+    const mw = new RateLimitMiddleware(opts);
 
     // Global agent should be fine
     const globalResult = await mw.process(makeMockContext());

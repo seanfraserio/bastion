@@ -23,11 +23,8 @@ describe("Rate Limit Integration", () => {
 
   it("under limit succeeds", async () => {
     rateLimitMiddleware = new RateLimitMiddleware({
-      rate_limits: {
-        enabled: true,
-        requests_per_minute: 10,
-      },
-    } as any);
+      requestsPerMinute: 10,
+    });
 
     const forwardFn = async () => makeMockResponse();
     const pipeline = new Pipeline(forwardFn);
@@ -44,11 +41,8 @@ describe("Rate Limit Integration", () => {
   it("over limit throws PipelineBlockedError", async () => {
     // Use a very low RPM so token refill between sequential calls is negligible
     rateLimitMiddleware = new RateLimitMiddleware({
-      rate_limits: {
-        enabled: true,
-        requests_per_minute: 1,
-      },
-    } as any);
+      requestsPerMinute: 1,
+    });
 
     const forwardFn = async () => makeMockResponse();
     const pipeline = new Pipeline(forwardFn);
@@ -65,11 +59,8 @@ describe("Rate Limit Integration", () => {
 
   it("different IPs get independent rate limit buckets", async () => {
     rateLimitMiddleware = new RateLimitMiddleware({
-      rate_limits: {
-        enabled: true,
-        requests_per_minute: 2,
-      },
-    } as any);
+      requestsPerMinute: 2,
+    });
 
     const forwardFn = async () => makeMockResponse();
     const pipeline = new Pipeline(forwardFn);
@@ -93,11 +84,8 @@ describe("Rate Limit Integration", () => {
 
   it("blocked response has 429 status code", async () => {
     rateLimitMiddleware = new RateLimitMiddleware({
-      rate_limits: {
-        enabled: true,
-        requests_per_minute: 1,
-      },
-    } as any);
+      requestsPerMinute: 1,
+    });
 
     const forwardFn = async () => makeMockResponse();
     const pipeline = new Pipeline(forwardFn);
@@ -116,14 +104,9 @@ describe("Rate Limit Integration", () => {
 
   it("agent-specific overrides are respected", async () => {
     rateLimitMiddleware = new RateLimitMiddleware({
-      rate_limits: {
-        enabled: true,
-        requests_per_minute: 10,
-        agents: [
-          { name: "restricted-agent", requests_per_minute: 1 },
-        ],
-      },
-    } as any);
+      requestsPerMinute: 10,
+      agentOverrides: { "restricted-agent": 1 },
+    });
 
     const forwardFn = async () => makeMockResponse();
     const pipeline = new Pipeline(forwardFn);
