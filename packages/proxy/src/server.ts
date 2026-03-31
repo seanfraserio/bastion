@@ -25,7 +25,7 @@ import { FileExporter } from "./exporters/file.js";
 import { StdoutExporter } from "./exporters/stdout.js";
 import { HttpExporter } from "./exporters/http.js";
 import { registerObservability, recordMetric } from "./observability.js";
-import { registerSecurityHeaders } from "./lib/security-headers.js";
+import { registerSecurityHeaders } from "@freelancer/shared-utils/security-headers";
 import { instrumentPool } from "./lib/timed-pool.js";
 import { UpstreamProvider } from "./upstream/provider.js";
 import type { ForwardFn } from "./pipeline/index.js";

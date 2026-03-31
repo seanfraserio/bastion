@@ -19,6 +19,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@freelancer/shared-utils": "file:../../../shared-packages/shared-utils",
     "@google-cloud/pubsub": "^5.3.0",
     "@openbastion-ai/config": "workspace:*",
     "fastify": "^5.8.4",
