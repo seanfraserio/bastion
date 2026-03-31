@@ -26,6 +26,7 @@ import { StdoutExporter } from "./exporters/stdout.js";
 import { HttpExporter } from "./exporters/http.js";
 import { registerObservability, recordMetric } from "./observability.js";
 import { registerSecurityHeaders } from "./lib/security-headers.js";
+import { instrumentPool } from "./lib/timed-pool.js";
 import { UpstreamProvider } from "./upstream/provider.js";
 import type { ForwardFn } from "./pipeline/index.js";
 import type { StreamingResponse } from "./pipeline/types.js";
@@ -245,10 +246,10 @@ async function buildPipeline(config: BastionConfig): Promise<{
 
   if (databaseUrl && !config.redis?.enabled) {
     const { Pool: PgPool } = await import("pg");
-    pgPool = new PgPool({
+    pgPool = instrumentPool(new PgPool({
       connectionString: databaseUrl,
       max: 5,
-    });
+    }));
   }
 
   // Order: rate-limit -> injection -> policy(request) -> cache(request)
