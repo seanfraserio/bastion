@@ -10,6 +10,7 @@ import { AnthropicProvider } from "../providers/anthropic.js";
 import { OpenAIProvider } from "../providers/openai.js";
 import { OllamaProvider } from "../providers/ollama.js";
 import { BedrockProvider } from "../providers/bedrock.js";
+import { isPrivateUrl } from "@freelancer/shared-utils";
 
 export class ProviderError extends Error {
   constructor(
@@ -27,31 +28,6 @@ const PROVIDER_MAP: Record<string, () => IProvider> = {
   ollama: () => new OllamaProvider(),
   bedrock: () => new BedrockProvider(),
 };
-
-// ── Block private/reserved IPs in provider base_url (defense-in-depth) ──
-const PRIVATE_IP_PATTERNS = [
-  /^127\./,                          // loopback
-  /^10\./,                           // 10.0.0.0/8
-  /^172\.(1[6-9]|2\d|3[01])\./,     // 172.16.0.0/12
-  /^192\.168\./,                     // 192.168.0.0/16
-  /^169\.254\./,                     // link-local
-  /^0\./,                            // 0.0.0.0/8
-  /^\[?::1\]?$/,                     // IPv6 loopback
-  /^\[?fc/i,                         // IPv6 unique local
-  /^\[?fd/i,                         // IPv6 unique local
-  /^\[?fe80/i,                       // IPv6 link-local
-];
-
-function isPrivateUrl(urlStr: string): boolean {
-  try {
-    const parsed = new URL(urlStr);
-    const hostname = parsed.hostname;
-    if (hostname === "localhost") return true;
-    return PRIVATE_IP_PATTERNS.some((re) => re.test(hostname));
-  } catch {
-    return true; // invalid URL → block
-  }
-}
 
 // Known safe default URLs that are allowed even though some match private patterns
 const SAFE_DEFAULT_URLS = new Set([
@@ -199,7 +175,8 @@ function extractStatusCode(err: unknown): number | undefined {
     return err.statusCode;
   }
   if (err instanceof Error) {
-    const match = err.message.match(/\((\d{3})\)/);
+    // Match "status 429" or "(429)" patterns
+    const match = err.message.match(/\((\d{3})\)/) ?? err.message.match(/status (\d{3})/);
     if (match) {
       return parseInt(match[1], 10);
     }

@@ -57,6 +57,19 @@ export class RateLimitMiddleware implements PipelineMiddleware {
         this.evictStale();
       }
 
+      // If still at capacity after stale eviction, LRU-evict the oldest bucket
+      if (this.buckets.size >= MAX_BUCKETS) {
+        let oldestKey: string | null = null;
+        let oldestTime = Infinity;
+        for (const [key, bucket] of this.buckets) {
+          if (bucket.lastRefill < oldestTime) {
+            oldestTime = bucket.lastRefill;
+            oldestKey = key;
+          }
+        }
+        if (oldestKey) this.buckets.delete(oldestKey);
+      }
+
       const overrides = this.agentOverrides.get(key);
       const rpm = overrides?.rpm ?? this.globalRequestsPerMinute;
 

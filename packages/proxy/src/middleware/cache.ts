@@ -72,7 +72,7 @@ export class CacheMiddleware implements PipelineMiddleware {
         entry.lastAccessedAt = Date.now();
         ctx.cacheHit = true;
         ctx.metadata.cacheKey = key;
-        return { action: "short-circuit", response: { ...entry.response } };
+        return { action: "short-circuit", response: structuredClone(entry.response) };
       }
 
       // Store key in metadata for the response phase
@@ -106,7 +106,7 @@ export class CacheMiddleware implements PipelineMiddleware {
 
       const now = Date.now();
       this.cache.set(key, {
-        response: { ...ctx.response },
+        response: structuredClone(ctx.response),
         expiresAt: now + this.ttlMs,
         hits: 0,
         lastAccessedAt: now,

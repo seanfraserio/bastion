@@ -132,7 +132,7 @@ describe("AnthropicProvider", () => {
 
       await expect(
         provider.forward(makeRequest(), null, makeConfig()),
-      ).rejects.toThrow("Anthropic API error (401): Unauthorized");
+      ).rejects.toThrow("Provider request failed with status 401");
     });
   });
 

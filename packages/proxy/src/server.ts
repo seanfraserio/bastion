@@ -312,7 +312,7 @@ async function buildPipeline(config: BastionConfig): Promise<{
 export async function createServer(configPath?: string) {
   const resolvedPath =
     configPath ?? process.env.BASTION_CONFIG ?? "./bastion.yaml";
-  const config = await loadConfig(resolvedPath);
+  let config = await loadConfig(resolvedPath);
 
   // Warn if PII detection policies are configured (enterprise-only feature)
   const hasPiiPolicies = config.policies?.some(
@@ -591,6 +591,7 @@ export async function createServer(configPath?: string) {
   async function handleSighup(): Promise<void> {
     try {
       const newConfig = await loadConfig(resolvedPath);
+      config = newConfig;
       const rebuilt = await buildPipeline(newConfig);
       await exporter?.shutdown?.();
       await redisClient?.quit();

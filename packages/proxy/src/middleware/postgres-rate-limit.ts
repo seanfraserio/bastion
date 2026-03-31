@@ -12,8 +12,6 @@ export interface PostgresRateLimitOptions {
 
 const WINDOW_MS = 60_000;
 
-const MIGRATE_SQL = `DROP TABLE IF EXISTS rate_limits`;
-
 const CREATE_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS rate_limits (
     key TEXT NOT NULL,
@@ -61,8 +59,6 @@ export class PostgresRateLimitMiddleware implements PipelineMiddleware {
 
   private async ensureSchema(): Promise<void> {
     if (this.schemaReady) return;
-    // Migrate from old TIMESTAMPTZ schema if it exists
-    await this.pool.query(MIGRATE_SQL);
     await this.pool.query(CREATE_TABLE_SQL);
     this.schemaReady = true;
   }

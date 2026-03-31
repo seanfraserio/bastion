@@ -71,7 +71,8 @@ export class OllamaProvider implements IProvider {
 
       if (!res.ok) {
         const errorBody = await res.text();
-        throw new Error(`Ollama API error (${res.status}): ${errorBody}`);
+        console.error(`[bastion:ollama] Provider error (${res.status}): ${errorBody}`);
+        throw new Error(`Provider request failed with status ${res.status}`);
       }
 
       const data = (await res.json()) as OllamaResponse;

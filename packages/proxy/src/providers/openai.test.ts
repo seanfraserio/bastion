@@ -126,7 +126,7 @@ describe("OpenAIProvider", () => {
 
       await expect(
         provider.forward(makeRequest(), null, makeConfig()),
-      ).rejects.toThrow("OpenAI API error (429): Rate limited");
+      ).rejects.toThrow("Provider request failed with status 429");
     });
   });
 

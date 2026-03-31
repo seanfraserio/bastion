@@ -34,20 +34,20 @@ describe("PostgresRateLimitMiddleware", () => {
     expect(middleware.phase).toBe("request");
   });
 
-  it("migrates old table and creates new schema on first process() call", async () => {
+  it("creates schema idempotently on first process() call (no DROP TABLE)", async () => {
     const ctx = makeMockContext();
     await middleware.process(ctx);
 
     const allCalls = (pool.query as ReturnType<typeof vi.fn>).mock.calls;
     const dropCall = allCalls.find(
       (call: unknown[]) =>
-        typeof call[0] === "string" && call[0].includes("DROP TABLE IF EXISTS"),
+        typeof call[0] === "string" && call[0].includes("DROP TABLE"),
     );
     const createTableCall = allCalls.find(
       (call: unknown[]) =>
         typeof call[0] === "string" && call[0].includes("CREATE TABLE IF NOT EXISTS"),
     );
-    expect(dropCall).toBeDefined();
+    expect(dropCall).toBeUndefined();
     expect(createTableCall).toBeDefined();
   });
 

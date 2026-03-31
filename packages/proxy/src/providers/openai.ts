@@ -123,7 +123,8 @@ export class OpenAIProvider implements IProvider {
 
       if (!res.ok) {
         const errorBody = await res.text();
-        throw new Error(`OpenAI API error (${res.status}): ${errorBody}`);
+        console.error(`[bastion:openai] Provider error (${res.status}): ${errorBody}`);
+        throw new Error(`Provider request failed with status ${res.status}`);
       }
 
       const data = (await res.json()) as OpenAIResponse;
@@ -172,7 +173,8 @@ export class OpenAIProvider implements IProvider {
 
       if (!res.ok) {
         const errorBody = await res.text();
-        throw new Error(`OpenAI API error (${res.status}): ${errorBody}`);
+        console.error(`[bastion:openai] Provider streaming error (${res.status}): ${errorBody}`);
+        throw new Error(`Provider request failed with status ${res.status}`);
       }
 
       if (!res.body) {
