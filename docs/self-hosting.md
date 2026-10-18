@@ -204,7 +204,7 @@ spec:
               value: "http://localhost:4000"
 
         - name: bastion
-          image: ghcr.io/your-org/bastion:latest
+          image: ghcr.io/openbastion-ai/bastion:latest
           ports:
             - containerPort: 4000
               name: proxy
@@ -287,7 +287,7 @@ spec:
     spec:
       containers:
         - name: bastion
-          image: ghcr.io/your-org/bastion:latest
+          image: ghcr.io/openbastion-ai/bastion:latest
           ports:
             - containerPort: 4000
               name: proxy

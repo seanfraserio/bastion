@@ -156,7 +156,7 @@ Agent identity headers (`X-Bastion-Agent`, `X-Bastion-Team`, `X-Bastion-Env`) ar
 
 ## Forge Integration
 
-Bastion is designed to work seamlessly with [Forge](https://github.com/your-org/forge), the agent orchestration framework. The integration is straightforward because Bastion acts as a transparent proxy -- any application that makes HTTP calls to an LLM provider can route those calls through Bastion instead.
+Bastion is designed to work seamlessly with [Forge](https://github.com/seanfraserio/forge), the agent orchestration framework. The integration is straightforward because Bastion acts as a transparent proxy -- any application that makes HTTP calls to an LLM provider can route those calls through Bastion instead.
 
 With Forge routed through Bastion:
 

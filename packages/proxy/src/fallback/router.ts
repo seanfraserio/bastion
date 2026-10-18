@@ -10,7 +10,7 @@ import { AnthropicProvider } from "../providers/anthropic.js";
 import { OpenAIProvider } from "../providers/openai.js";
 import { OllamaProvider } from "../providers/ollama.js";
 import { BedrockProvider } from "../providers/bedrock.js";
-import { isPrivateUrl } from "@freelancer/shared-utils";
+import { isPrivateUrl } from "../utils/url-utils.js";
 
 export class ProviderError extends Error {
   constructor(

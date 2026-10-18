@@ -40,17 +40,21 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck
-        run: pnpm typecheck
+      - name: Toolchain security contracts
+        run: node scripts/toolchain-security.test.mjs
 
       - name: Build
         run: pnpm build
+
+      - name: Typecheck
+        run: pnpm typecheck
 
       - name: Verify package exports
         run: |
           node -e "require('./packages/config/dist/index.js'); console.log('@openbastion-ai/config OK')"
           node -e "require('./packages/proxy/dist/index.js'); console.log('@openbastion-ai/proxy OK')"
           node -e "require('./packages/sdk/dist/index.js'); console.log('@openbastion-ai/sdk OK')"
+          node scripts/pack-smoke.mjs
           echo "All package exports resolve correctly"
 
       - name: Lint
@@ -66,4 +70,4 @@ jobs:
           fail_ci_if_error: false
 
       - name: Security audit
-        run: pnpm audit --audit-level=high || true  # non-blocking; weekly audit workflow creates issues
+        run: pnpm audit --audit-level=high
