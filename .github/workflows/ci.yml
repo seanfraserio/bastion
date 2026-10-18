@@ -45,6 +45,14 @@ jobs:
       - name: Toolchain security contracts
         run: node scripts/toolchain-security.test.mjs
 
+      - name: CI wiring contracts
+        run: node --test scripts/ci-contract.test.mjs
+
+      - name: Dependency compatibility contracts
+        run: |
+          node scripts/dependency-contract.fixtures.test.mjs
+          node scripts/dependency-contract.test.mjs
+
       - name: Build
         run: pnpm build
 
@@ -56,7 +64,9 @@ jobs:
           node -e "require('./packages/config/dist/index.js'); console.log('@openbastion-ai/config OK')"
           node -e "require('./packages/proxy/dist/index.js'); console.log('@openbastion-ai/proxy OK')"
           node -e "require('./packages/sdk/dist/index.js'); console.log('@openbastion-ai/sdk OK')"
+          node scripts/run-pack-smoke-test.mjs
           node scripts/pack-smoke.mjs
+          node scripts/pack-consumer-smoke.mjs
           echo "All package exports resolve correctly"
 
       - name: Lint
