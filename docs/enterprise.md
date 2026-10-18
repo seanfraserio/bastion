@@ -12,7 +12,7 @@ To install the enterprise package, clone it into your Bastion project:
 
 ```bash
 cd packages/
-git clone https://github.com/your-org/bastion-enterprise.git enterprise
+git clone https://github.com/openbastion-ai/bastion-enterprise.git enterprise
 cd enterprise
 npm install
 npm run build

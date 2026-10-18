@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, type MockInstance } from "vitest"
 // Mock ioredis before importing the module under test
 vi.mock("ioredis", () => {
   const mockOn = vi.fn().mockReturnThis();
-  const MockRedis = vi.fn().mockImplementation(() => ({ on: mockOn }));
+  const MockRedis = vi.fn().mockImplementation(function () { return { on: mockOn }; });
   return { default: MockRedis };
 });
 
@@ -54,7 +54,7 @@ describe("createRedisClient", () => {
 
   it("registers an error event handler", () => {
     const mockClient = { on: vi.fn().mockReturnThis() };
-    RedisMock.mockImplementationOnce(() => mockClient);
+    RedisMock.mockImplementationOnce(function () { return mockClient; });
 
     createRedisClient({ url: "redis://localhost:6379" });
 
@@ -63,7 +63,7 @@ describe("createRedisClient", () => {
 
   it("returns the Redis client instance", () => {
     const mockClient = { on: vi.fn().mockReturnThis() };
-    RedisMock.mockImplementationOnce(() => mockClient);
+    RedisMock.mockImplementationOnce(function () { return mockClient; });
 
     const result = createRedisClient({ url: "redis://localhost:6379" });
 

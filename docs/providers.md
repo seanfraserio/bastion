@@ -20,11 +20,11 @@ Bastion supports the Anthropic Messages API. All Claude models available through
 
 | Model | Input (per 1M tokens) | Output (per 1M tokens) |
 |-------|----------------------|------------------------|
-| `claude-opus-4-20250514` | $15.00 | $75.00 |
-| `claude-sonnet-4-20250514` | $3.00 | $15.00 |
-| `claude-haiku-3-20250414` | $0.80 | $4.00 |
+| `claude-opus-4-6` | $15.00 | $75.00 |
+| `claude-sonnet-4-6` | $3.00 | $15.00 |
+| `claude-haiku-4-5-20251001` | $0.80 | $4.00 |
 
-All other models available via the Anthropic API are also supported. Pricing for additional models is determined by Anthropic and may change. Consult the [Anthropic pricing page](https://www.anthropic.com/pricing) for current rates.
+These are the model IDs with built-in cost estimates (`packages/proxy/src/costs.ts`). Other Anthropic model IDs are forwarded, but unlisted models estimate as $0. Provider pricing can change; consult the [Anthropic pricing page](https://www.anthropic.com/pricing) before relying on these figures.
 
 ### Example
 
@@ -49,23 +49,17 @@ Bastion supports the OpenAI Chat Completions API. Any OpenAI-compatible endpoint
 |-------|------|----------|---------|
 | `api_key` | `string` | Yes | -- |
 | `timeout_ms` | `number` | No | `30000` |
-| `base_url` | `string` | No | `"https://api.openai.com/v1"` |
+| `base_url` | `string` | No | `"https://api.openai.com"` |
 
 ### Supported Models
 
 | Model | Input (per 1M tokens) | Output (per 1M tokens) |
 |-------|----------------------|------------------------|
-| `gpt-4o` | $2.50 | $10.00 |
+| `gpt-4o` | $5.00 | $15.00 |
 | `gpt-4o-mini` | $0.15 | $0.60 |
-| `gpt-4-turbo` | $10.00 | $30.00 |
-| `o1` | $15.00 | $60.00 |
-| `o1-mini` | $1.10 | $4.40 |
-| `o1-pro` | $150.00 | $600.00 |
-| `o3` | $10.00 | $40.00 |
 | `o3-mini` | $1.10 | $4.40 |
-| `o4-mini` | $1.10 | $4.40 |
 
-All other models available via the OpenAI API are also supported. Pricing is determined by OpenAI and may change. Consult the [OpenAI pricing page](https://openai.com/pricing) for current rates.
+These are the OpenAI model IDs with built-in cost estimates. Other model IDs are forwarded to the Chat Completions endpoint, but unlisted models estimate as $0. The default `base_url` is `https://api.openai.com`; the adapter appends `/v1/chat/completions`, so do not include `/v1` in `base_url`. Consult the [OpenAI pricing page](https://openai.com/pricing) before relying on these figures.
 
 ### Example
 
@@ -88,7 +82,7 @@ Bastion supports locally-hosted models via Ollama. No API key is required. Ollam
 | Field | Type | Required | Default |
 |-------|------|----------|---------|
 | `base_url` | `string` | No | `"http://localhost:11434"` |
-| `timeout_ms` | `number` | No | `60000` |
+| `timeout_ms` | `number` | No | `30000` |
 
 ### Supported Models
 
@@ -122,52 +116,15 @@ providers:
 
 ## Bedrock
 
-Bastion supports AWS Bedrock for accessing foundation models through AWS infrastructure. Bedrock provider support is currently in preview. The configuration interface is stable, but some features (streaming, certain model families) may have limitations that are being addressed in upcoming releases.
+The Bedrock adapter is registered so configuration can name it, but `BedrockProvider.forward()` currently throws `Bedrock provider not yet implemented`. `supports()` returns false for every model and `estimateCost()` returns 0. There is no AWS credential chain, region field, or SigV4 client in this package.
 
-### Configuration
-
-| Field | Type | Required | Default |
-|-------|------|----------|---------|
-| `region` | `string` | Yes | -- |
-| `access_key_id` | `string` | No | -- |
-| `secret_access_key` | `string` | No | -- |
-| `timeout_ms` | `number` | No | `30000` |
-
-If `access_key_id` and `secret_access_key` are not provided, Bastion uses the default AWS credential chain: environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`), shared credentials file (`~/.aws/credentials`), EC2/ECS instance role, and SSO credentials, in that order.
-
-### Supported Models
-
-Bedrock model availability depends on the AWS region and the models enabled in the AWS account. The following are commonly available models:
-
-| Model ID | Provider | Input (per 1M tokens) | Output (per 1M tokens) |
-|----------|----------|----------------------|------------------------|
-| `anthropic.claude-3-5-sonnet-20241022-v2:0` | Anthropic | $3.00 | $15.00 |
-| `anthropic.claude-3-haiku-20240307-v1:0` | Anthropic | $0.25 | $1.25 |
-| `amazon.titan-text-premier-v1:0` | Amazon | $0.50 | $1.50 |
-| `amazon.titan-text-lite-v1` | Amazon | $0.15 | $0.20 |
-| `meta.llama3-70b-instruct-v1:0` | Meta | $2.65 | $3.50 |
-| `meta.llama3-8b-instruct-v1:0` | Meta | $0.30 | $0.60 |
-| `mistral.mistral-large-2407-v1:0` | Mistral | $4.00 | $12.00 |
-
-Pricing listed is on-demand Bedrock pricing and may differ from direct API pricing. Consult the [AWS Bedrock pricing page](https://aws.amazon.com/bedrock/pricing/) for current rates and regional availability.
+Provider definitions only accept `api_key`, `base_url`, and `timeout_ms` (`packages/config/src/schema.ts`). `region`, `access_key_id`, and `secret_access_key` are not config fields and will fail schema validation. Do not point production traffic at `bedrock` until the adapter is implemented.
 
 ### Known Limitations
 
-- Streaming responses are not yet fully supported for all Bedrock model families.
-- Tool use (function calling) passthrough is supported for Anthropic models on Bedrock but not yet for other model families.
-- Cross-region inference profiles are not currently handled; each Bastion instance connects to a single region.
-
-### Example
-
-```yaml
-providers:
-  primary: bedrock
-  definitions:
-    bedrock:
-      region: "us-east-1"
-      access_key_id: "${AWS_ACCESS_KEY_ID}"
-      secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
-```
+- Requests are not forwarded to AWS Bedrock.
+- Streaming and tool-use passthrough are not implemented.
+- Built-in cost tables do not include Bedrock model IDs.
 
 ---
 
@@ -177,12 +134,7 @@ Bastion can route requests to a fallback provider when the primary provider is u
 
 ### Fallback Triggers
 
-Bastion initiates fallback when the primary provider returns one of the following:
-
-- **HTTP 5xx errors** -- Server-side failures from the provider indicating an outage or internal error.
-- **Connection timeouts** -- The provider did not respond within the configured `timeout_ms` window.
-- **Rate limit errors (HTTP 429)** -- The provider rejected the request due to rate limiting.
-- **Connection failures** -- DNS resolution failures, TCP connection refused, or TLS handshake errors.
+Bastion initiates fallback only when the primary error carries status 429 or 5xx (`packages/proxy/src/fallback/router.ts`). Timeouts, DNS failures, and connection errors that do not include that status are not retried on the fallback provider.
 
 ### Request Normalization
 

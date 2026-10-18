@@ -5,14 +5,16 @@ Thanks for your interest in contributing to Bastion — an AI agent gateway and 
 ## Getting Started
 
 ```bash
-git clone https://github.com/openbastion-ai/bastion.git
+git clone https://github.com/seanfraserio/bastion.git
 cd bastion
 pnpm install
 pnpm build
 pnpm test
 ```
 
-You'll need **Node.js 20+** and **pnpm** installed globally (`npm i -g pnpm`).
+You'll need **Node.js 20.19+ (or 22.13+)** and **pnpm** installed globally (`npm i -g pnpm`) for development. This private workspace's Vite and ESLint toolchain needs newer Node patch releases; the published packages retain their Node.js 20+ runtime support.
+
+Security/dependency contracts: `node scripts/toolchain-security.test.mjs` and `node scripts/dependency-contract.test.mjs` (after installing).
 
 ## Development Workflow
 
@@ -48,7 +50,7 @@ Commits don't need to follow a specific convention, but a short descriptive subj
 
 ## Reporting Bugs
 
-Open a [GitHub Issue](https://github.com/openbastion-ai/bastion/issues) and include:
+Open a [GitHub Issue](https://github.com/seanfraserio/bastion/issues) and include:
 
 - A minimal reproduction (config snippet, request/response, or a failing test).
 - The Bastion version you're running (`pnpm list | grep bastion`).

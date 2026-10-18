@@ -160,8 +160,8 @@ See [Self-Hosting docs](./docs/self-hosting.md) for Docker Compose, Kubernetes, 
 
 Bastion is the third product in the **Forge / Lantern / Bastion** trilogy for production AI agent systems:
 
-- **[Forge](https://github.com/your-org/forge)** -- Define and orchestrate AI agents with structured workflows, tool use, and multi-agent coordination.
-- **[Lantern](https://github.com/your-org/lantern)** -- Observe agent behavior with distributed traces, metrics, dashboards, and anomaly detection.
+- **[Forge](https://github.com/seanfraserio/forge)** -- Define and orchestrate AI agents with structured workflows, tool use, and multi-agent coordination.
+- **[Lantern](https://github.com/seanfraserio/lantern)** -- Observe agent behavior with distributed traces, metrics, dashboards, and anomaly detection.
 - **Bastion** -- Govern agent traffic with policies, rate limits, PII redaction, injection detection, and audit logging.
 
 Point Forge's `base_url` at Bastion. Enable Lantern integration in `bastion.yaml`. All three work independently but are designed to work together.

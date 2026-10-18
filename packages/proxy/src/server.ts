@@ -1,6 +1,5 @@
 import Fastify from "fastify";
-import { v4 as uuidv4 } from "uuid";
-import { timingSafeEqual } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { createRequire } from "node:module";
 import { loadConfig, type BastionConfig } from "@openbastion-ai/config";
 import { Pipeline, PipelineBlockedError } from "./pipeline/index.js";
@@ -25,7 +24,7 @@ import { FileExporter } from "./exporters/file.js";
 import { StdoutExporter } from "./exporters/stdout.js";
 import { HttpExporter } from "./exporters/http.js";
 import { registerObservability, recordMetric } from "./observability.js";
-import { registerSecurityHeaders } from "@freelancer/shared-utils/security-headers";
+import { registerSecurityHeaders } from "./utils/security-headers.js";
 import { instrumentPool } from "./lib/timed-pool.js";
 import { UpstreamProvider } from "./upstream/provider.js";
 import type { ForwardFn } from "./pipeline/index.js";
@@ -138,7 +137,7 @@ function buildPipelineContext(
   if (rawRequestId && VALID_REQUEST_ID.test(rawRequestId)) {
     requestId = rawRequestId;
   } else {
-    requestId = uuidv4();
+    requestId = randomUUID();
     if (rawRequestId) {
       console.warn(`[bastion] Rejected invalid x-request-id: ${JSON.stringify(rawRequestId).slice(0, 200)}`);
     }
@@ -152,7 +151,7 @@ function buildPipelineContext(
       : "production";
 
   return {
-    id: uuidv4(),
+    id: randomUUID(),
     requestId,
     agentName: typeof headers["x-bastion-agent"] === "string" && VALID_ENV.test(headers["x-bastion-agent"]) ? headers["x-bastion-agent"] : undefined,
     teamName: typeof headers["x-bastion-team"] === "string" && VALID_ENV.test(headers["x-bastion-team"]) ? headers["x-bastion-team"] : undefined,
