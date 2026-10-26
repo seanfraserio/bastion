@@ -22,7 +22,7 @@
     "@freelancer/shared-utils": "file:../../../shared-packages/shared-utils",
     "@google-cloud/pubsub": "^5.3.0",
     "@openbastion-ai/config": "workspace:*",
-    "fastify": "^5.8.4",
+    "fastify": "^5.12.2",
     "ioredis": "^5.10.1",
     "pg": "^8.20.0",
     "pino": "^9.0.0",
