@@ -25,7 +25,7 @@ import { FileExporter } from "./exporters/file.js";
 import { StdoutExporter } from "./exporters/stdout.js";
 import { HttpExporter } from "./exporters/http.js";
 import { registerObservability, recordMetric } from "./observability.js";
-import { registerSecurityHeaders } from "@freelancer/shared-utils/security-headers";
+import { registerSecurityHeaders } from "./lib/security-headers.js";
 import { instrumentPool } from "./lib/timed-pool.js";
 import { UpstreamProvider } from "./upstream/provider.js";
 import type { ForwardFn } from "./pipeline/index.js";
@@ -360,7 +360,7 @@ export async function createServer(configPath?: string) {
   });
 
   // Security headers
-  await registerSecurityHeaders(app, { hsts: false });
+  registerSecurityHeaders(app);
 
   // Proxy handler factory
   function createProxyHandler(defaultProvider: ProviderName) {

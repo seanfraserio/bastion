@@ -9,7 +9,8 @@ overrides:
   picomatch: '>=4.0.4'
   undici@<7: '>=6.24.0 <7'
   undici@>=7 <8: 7.30.1
-  brace-expansion: 5.0.11
+  brace-expansion@^1: 1.1.22
+  brace-expansion@^2: 2.1.8
   cookie: '>=0.7.0'
   next: '>=15.5.28 <16'
   next>sharp: 0.35.5
@@ -271,9 +272,9 @@ importers:
 
   packages/proxy:
     dependencies:
-      '@freelancer/shared-utils':
-        specifier: file:../../../shared-packages/shared-utils
-        version: file:../shared-packages/shared-utils(fastify@5.12.2)(zod@4.6.6)
+      ipaddr.js:
+        specifier: 2.3.0
+        version: 2.3.0
       '@google-cloud/pubsub':
         specifier: ^5.3.0
         version: 5.3.0
@@ -1059,19 +1060,6 @@ packages:
   '@floating-ui/utils@0.2.11':
     resolution: {integrity: sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg==}
 
-  '@freelancer/shared-utils@file:../shared-packages/shared-utils':
-    resolution: {directory: ../shared-packages/shared-utils, type: directory}
-    peerDependencies:
-      fastify: 5.12.2
-      hono: ^4.5.0
-      zod: 4.6.6
-    peerDependenciesMeta:
-      fastify:
-        optional: true
-      hono:
-        optional: true
-      zod:
-        optional: true
 
   '@gar/promise-retry@1.0.3':
     resolution: {integrity: sha512-GmzA9ckNokPypTg10pgpeHNQe7ph+iIKKmhKu3Ob9ANkswreCx7R3cKmY781K8QK3AqVL3xVh9A42JvIAbkkSA==}
@@ -5675,6 +5663,18 @@ packages:
   zod@4.6.6:
     resolution: {integrity: sha512-4UmzQUF5fxvfcYHlbjBmejU+w+hbDnWFx4aS8kBx7nPBHcO2SqPbpAG8snbdg+Xse4pRefR98hgjFgIMCI/UhA==}
 
+  balanced-match@1.0.2:
+    resolution: {integrity: sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==}
+
+  brace-expansion@1.1.22:
+    resolution: {integrity: sha512-CKLDTuSsN0+r1ThM0WkzzBI7dnPI6xEGfa/JnVYIK9JNBA1N1NyPwXVHor//NKD/y3sDxp764sZdLhFK7pH8XQ==}
+
+  brace-expansion@2.1.8:
+    resolution: {integrity: sha512-BnlDzDYQoplTsZSvPi86CNzmbcb07X8ufR8fk1zivaiEJlXJkiq1MQyDCVmlWcsWbj6aWXqHnrwwevbrm/Saig==}
+
+  concat-map@0.0.1:
+    resolution: {integrity: sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==}
+
 snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
@@ -6182,10 +6182,6 @@ snapshots:
 
   '@floating-ui/utils@0.2.11': {}
 
-  '@freelancer/shared-utils@file:../shared-packages/shared-utils(fastify@5.12.2)(zod@4.6.6)':
-    optionalDependencies:
-      fastify: 5.12.2
-      zod: 4.6.6
 
   '@gar/promise-retry@1.0.3': {}
 
@@ -9608,11 +9604,11 @@ snapshots:
 
   minimatch@3.1.5:
     dependencies:
-      brace-expansion: 5.0.11
+      brace-expansion: 1.1.22
 
   minimatch@9.0.9:
     dependencies:
-      brace-expansion: 5.0.11
+      brace-expansion: 2.1.8
 
   minimist@1.2.8: {}
 
@@ -11294,3 +11290,16 @@ snapshots:
       zod: 4.6.6
 
   zod@4.6.6: {}
+
+  balanced-match@1.0.2: {}
+
+  brace-expansion@1.1.22:
+    dependencies:
+      balanced-match: 1.0.2
+      concat-map: 0.0.1
+
+  brace-expansion@2.1.8:
+    dependencies:
+      balanced-match: 1.0.2
+
+  concat-map@0.0.1: {}
