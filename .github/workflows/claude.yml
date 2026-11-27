@@ -5,8 +5,6 @@ on:
     types: [created]
   pull_request_review_comment:
     types: [created]
-  pull_request:
-    types: [opened]
 
 jobs:
   # ============================================
@@ -34,41 +32,3 @@ jobs:
         uses: anthropics/claude-code-action@4411a9e9b0283becf4b924f7bce360fd7756c78c # v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-
-  # ============================================
-  # REVIEW - Auto-review PRs on open/push
-  # ============================================
-  claude-review:
-    name: Claude Review
-    if: |
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: read
-      pull-requests: write
-      issues: write
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          fetch-depth: 0
-
-      - name: Run Claude Review
-        uses: anthropics/claude-code-action@4411a9e9b0283becf4b924f7bce360fd7756c78c # v1
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          prompt: |
-            Review this pull request for:
-            1. Correctness - logic errors, edge cases, off-by-one errors
-            2. Security - proxy bypass, header injection, auth issues, rate limiting gaps
-            3. API design - breaking changes, backward compatibility
-            4. Code quality - dead code, unclear naming, missing error handling
-
-            This is Bastion, an open-source TypeScript monorepo (pnpm, tsup, vitest) for API proxy infrastructure.
-            Security is especially important here — this is a proxy layer that handles API keys and routing.
-            This is a public OSS project — pay attention to public API surface, documentation accuracy, and semver implications.
-            Focus on actionable findings. Skip style nits unless they affect readability.
-            Post findings as inline review comments on specific lines.
